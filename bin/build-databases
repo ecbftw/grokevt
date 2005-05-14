@@ -1,0 +1,222 @@
+#!/usr/bin/python
+#
+# $Id: $
+#
+# builds message databases for use by event log parser
+#
+
+import sys
+import os
+import popen2
+import anydbm
+
+def usage():
+    print "build-databases <SYSTEM_REGISTRY> <OUTPUT_DIR>"
+    sys.exit(1)
+
+
+def windowsPathToUnixPath(path_list, variables, drives):
+    ret_val = path_list.lower()
+
+    for s in variables.items():
+        ret_val = ret_val.replace(s[0].lower(), s[1].lower())
+
+    ret_val = ret_val.replace("\\", "/")
+
+    paths = ret_val.split(';')
+    ret_val = []
+    for p in paths:
+        for s in drives.items():
+            if p.startswith(s[0].lower()):
+                p = p.replace(s[0].lower(), s[1], 1)
+        ret_val.append(p)
+
+    return ret_val
+
+
+def buildShortNamesPathsDicts(paths):
+    ret_val1 = {}
+    ret_val2 = {}
+    for p in paths.keys():
+        if os.path.isfile(p):
+            sn = os.path.basename(p).replace(':','_')
+            ext = '.db'
+            i = 2
+            while ret_val1.has_key(sn + ext):
+                ext = '_'+i+'.db'
+                i += 1
+
+            ret_val1[sn+ext] = p
+            ret_val2[p] = sn+ext
+        else:
+            sys.stderr.write("WARNING: %s doesn't exist.\n" % p)
+    
+    return (ret_val1, ret_val2)
+
+
+#XXX: This currently throws an exception if the directories exist.
+#     This should be caught and dealt with.
+def makeOutputDirectories(topdir, logs):
+    for log in logs:
+        os.makedirs('%s/services/%s'%(topdir,log), 0755)
+    os.makedirs('%s/messages'%topdir, 0755)
+    os.makedirs('%s/logs'%topdir, 0755)
+
+
+def writeServiceMapping(topdir, maps):
+    for lt in maps.keys():
+        for t in maps[lt].keys():
+            db_file = "%s/services/%s/%s.db"%(topdir,lt,t)
+            db = anydbm.open(db_file, "n", 0644)
+            for si in maps[lt][t].items():
+                db[si[0]] = si[1]
+            db.sync()
+            db.close()
+
+
+def writeDBFiles(topdir, names2paths):
+    for npi in names2paths.items():
+        db_call = (PATH_RIPDLL, npi[1], "%s/messages/%s" % (topdir, npi[0]))
+        #XXX: Catch return codes & stderr
+        child_proc = popen2.Popen3(db_call, 1)
+        child_proc.wait()
+
+
+REGPATH_EVENTLOG='$$$PROTO.HIV/ControlSet001/Services/Eventlog'
+PATH_REGLOOKUP='/home/tim/bin/reglookup'
+PATH_RIPDLL='/home/tim/projects/grok-evt/bin/ripdll'
+
+
+if len(sys.argv) < 3:
+    usage()
+
+PATH_REGISTRY=sys.argv[1]
+PATH_OUTPUT=sys.argv[2]
+#XXX: get variable replacements and drive replacements
+#     from configuration file.
+PATH_MAPPING = {"%SystemRoot%":"c:\WINNT"}
+DRIVE_MAPPING = {"c:":"/mnt/win/c"}
+
+
+print "Reading registry for service information..."
+logs_query=(PATH_REGLOOKUP,"-tKEY","-f%s" % REGPATH_EVENTLOG, PATH_REGISTRY)
+child_proc = popen2.Popen3(logs_query, 1)
+
+# First, identify all log types by grabbing all keys under the eventlog key
+log_types = {}
+prefix_len = len(REGPATH_EVENTLOG)
+l = child_proc.fromchild.readline()
+while l != '':
+    l = l[prefix_len:].lstrip('/').split('/')[0].split(':')[0].strip()
+    if l:
+        #XXX: decode log_type (l), one at a time
+        #XXX: do log names need to be case-squashed?
+        log_types[l] = None
+    l = child_proc.fromchild.readline()
+
+l = child_proc.childerr.readline()
+while l != '':
+    sys.stderr.write("ERROR: %s reported: %s\n" % (PATH_REGLOOKUP, l))
+    l = child_proc.childerr.readline()
+
+# Now, for each log type, grab list of all services in the Sources MULTI_SZ
+files = {}
+evt_files = {}
+for lt in log_types.keys():
+    evt_query = (PATH_REGLOOKUP,
+                 "-tEXPAND_SZ",
+                 "-f%s/%s/File" % (REGPATH_EVENTLOG,lt),
+                 PATH_REGISTRY)
+    child_proc = popen2.Popen3(evt_query, 1)
+    l = child_proc.fromchild.readline().split('=')[1].strip()
+    evt_files[lt] = windowsPathToUnixPath(l, PATH_MAPPING,
+                                          DRIVE_MAPPING)[0]
+    
+    logs_query = (PATH_REGLOOKUP,
+                  "-tMULTI_SZ",
+                  "-f%s/%s/Sources" % (REGPATH_EVENTLOG,lt),
+                  PATH_REGISTRY)
+    child_proc = popen2.Popen3(logs_query, 1)
+    log_types[lt] = {}
+    log_types[lt]["event"] = {}
+    log_types[lt]["category"] = {}
+    log_types[lt]["parameter"] = {}
+    
+
+    # For each service under this log type, grab the associated event,
+    # category, and parameter message file lists.
+    #XXX: record/print child errors
+    l = child_proc.fromchild.readline()
+    services = l.split('=')[1].split('|')
+    for s in services:
+        s = s.strip()
+        #XXX: decode service names (s), one at a time
+        service_path = "%s/%s/%s/" % (REGPATH_EVENTLOG,lt,s)
+        service_path_len = len(service_path)
+        dlls_query = (PATH_REGLOOKUP,
+                      "-tEXPAND_SZ",
+                      "-f%s" % service_path,
+                      PATH_REGISTRY)
+
+        s = s.lower()
+        child_proc = popen2.Popen3(dlls_query, 1)
+        #XXX: record/print child errors
+        lines = child_proc.fromchild.readlines()
+        for l in lines:
+            # This is just to speed up the find() calls
+            l = l[service_path_len:]
+
+            t = None
+            if l.find("EventMessageFile") >= 0:
+                t = "event"
+            elif l.find("CategoryMessageFile") >= 0:
+                t = "category"
+            elif l.find("ParameterMessageFile") >= 0:
+                t = "parameter"
+            if t:
+                #XXX: unquote result before assignment
+                log_types[lt][t][s]\
+                  = windowsPathToUnixPath(l.split('=')[1].strip(),
+                                          PATH_MAPPING,
+                                          DRIVE_MAPPING)
+                # Retain unique list of file names
+                for f in log_types[lt][t][s]:
+                    files[f] = None
+
+(names2paths,paths2names) = buildShortNamesPathsDicts(files)
+
+# Convert path lists to named path strings.  Filter out any unusable resources
+# and any services that have no remaining resources.
+for lt in log_types.keys():
+    for t in log_types[lt].keys():
+        for s in log_types[lt][t].keys():
+            tmp_str = ''
+            for i in range(0,len(log_types[lt][t][s])):
+                if paths2names.has_key(log_types[lt][t][s][i]):
+                    tmp_str += ':' + paths2names[log_types[lt][t][s][i]]
+            log_types[lt][t][s] = tmp_str.lstrip(':')
+            print "%s\t=\t%s" % (s, log_types[lt][t][s])
+            if log_types[lt][t][s] == '':
+                sys.stderr.write("WARNING: service %s removed" % s\
+                                 +" due to missing message sources.\n")
+                del log_types[lt][t][s]
+
+print "Writing service mappings..."
+makeOutputDirectories(PATH_OUTPUT, log_types.keys())
+writeServiceMapping(PATH_OUTPUT, log_types)
+
+print "Writing DLL databases..."
+writeDBFiles(PATH_OUTPUT, names2paths)
+
+print "Copying log files..."
+for ei in evt_files.items():
+    o = file("%s/logs/%s.evt" % (PATH_OUTPUT,ei[0]), "w+")
+    i = file(ei[1], "r")
+    buf = i.read(1024)
+    while buf != "":
+        o.write(buf)
+        buf = i.read(1024)
+    o.close()
+    i.close()
+
+print "Done."
