@@ -29,8 +29,10 @@ import string
 import os
 import struct
 import anydbm
+import re
 import time
 import csv
+
 
 def usage():
     print "USAGE:"
@@ -80,7 +82,41 @@ def binSIDtoASCII(rev,dashes,b0,b1,b2,b3,b4,b5,
 
    return result
 
+# Reference:
+#  http://msdn.microsoft.com/library/en-us/winui/winui/windowsuserinterface/resources/strings/stringreference/stringfunctions/wsprintf.asp
+#
+# returns a formatted string.
+def wsprintf(fmt, vars):
+    # Python's formatting is very close to wsprintf's.  Just a few types need
+    # to be converted.  This isn't 100% compliant with the spec.
 
+    optionals = r'(-?#?0?[0-9]*[.]?[0-9]*)'
+
+    # S,ls,lS,hs,hS => s
+    py_fmt = re.sub('%'+optionals+'[lh]{0,1}[sS]',
+                    r'%\1s', fmt)
+    
+    # lu,li,ld,hu,hi,hd => d
+    py_fmt = re.sub('%'+optionals+'[lh][uid]',
+                    r'%\1d', py_fmt)
+
+    # lc,lC,C => c
+    py_fmt = re.sub('%'+optionals+'l{0,1}[cC]',
+                    r'%\1c', py_fmt)
+
+    # lx => x; lX => X
+    py_fmt = re.sub('%'+optionals+'l([xX])',
+                    r'%\1\2', py_fmt)
+
+    # p => d
+    py_fmt = re.sub('%'+optionals+'p',
+                    r'%\1d', py_fmt)
+
+    return (py_fmt % vars)
+
+
+# Reference:
+#  http://msdn.microsoft.com/library/en-us/debug/base/formatmessage.asp
 def formatMessage(fmt, vars):
    # states:
    # 0: normal text
@@ -170,15 +206,17 @@ class messageRepository:
        return ret_val
 
 
+if (len(sys.argv) != 3) or (sys.argv[1] == '-h') or (sys.argv[1] == '--help'):
+    usage()
+    sys.exit(1)
+
 DB_PATH=sys.argv[1]
 if len(sys.argv) == 2:
     logs = os.listdir("%s/services" % DB_PATH)
     for l in logs:
         print l
     sys.exit(0)
-elif (len(sys.argv) != 3) or (sys.argv[1] == '-h') or (sys.argv[1] == '--help'):
-    usage()
-    sys.exit(1)
+
 
 
 LOG=sys.argv[2]
