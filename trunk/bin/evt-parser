@@ -1,17 +1,16 @@
 #!/usr/bin/python
 
-# This script will take an input Windows Event Log
-# and parse it to stdout as ASCII text.
-# Purpose: Useful for forensics being conducted on an
-# evidence drive (specifically under *NIX).
+# This script will take an input Windows Event Log and parse it to
+# stdout as ASCII text.  This is particularly useful for forensics being
+# conducted on an evidence drive under *NIX.
 #
-# The original code was written in PHP by Jamie French.  It has
-# been since ported to Python and extended by Timothy Morgan.
+# The original code was written in PHP by Jamie French.  It has been
+# since ported to Python and extended by Timothy Morgan.
 #
 # For the original PHP version, please see:
 #http://www.whitehats.ca/main/members/Malik/malik_eventlogs/malik_eventlogs.html
 # 
-# Copyright (C) 2005 Timothy Morgan
+# Copyright (C) 2005 Timothy D. Morgan
 # Copyright (C) 2004 Jamie French
 #
 # This program is free software; you can redistribute it and/or
@@ -23,6 +22,9 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
+#
+# $Id$
+
 
 import sys
 import string

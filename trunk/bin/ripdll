@@ -1,15 +1,27 @@
-#! /usr/bin/python
+#!/usr/bin/python
 
-###
-###  Original code borrowed from the pymavis project
-###
-###  Copyright (C) 2005 Timothy Morgan
-###  Copyright (C) 2004 A'rpi
-###
-###  This file is subject to the terms and conditions of the GNU
-###  General Public License. See the file COPYING in the main
-###  directory of the Linux distribution for more details.
-###
+# This script parses a PE formatted file (EXE/DLL) and extracts the
+# message resources out of the .rsrc section.  They are then written to
+# a database file.
+#
+# Original code borrowed from the pymavis project.
+# For more information, see: http://www.mplayerhq.hu/~arpi/pymavis/
+#
+# Copyright (C) 2005 Timothy D. Morgan
+# Copyright (C) 2004 A'rpi
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation version 2 of the
+# License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# $Id$
+
 
 import os
 import sys
@@ -175,6 +187,7 @@ def dump_exe(f):
     return None
 
 
+#XXX: need usage statement
 if len(sys.argv) != 3:
     print("ERROR: requires exactly 2 arguments.")
     sys.exit(1)
