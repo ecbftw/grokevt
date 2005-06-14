@@ -22,6 +22,7 @@ import os
 import popen2
 import anydbm
 
+# XXX: need better usage statement.
 def usage():
     print "build-databases <SYSTEM_REGISTRY> <OUTPUT_DIR>"
     sys.exit(1)
@@ -66,13 +67,20 @@ def buildShortNamesPathsDicts(paths):
     return (ret_val1, ret_val2)
 
 
-#XXX: This currently throws an exception if the directories exist.
-#     This should be caught and dealt with.
 def makeOutputDirectories(topdir, logs):
+    dirs = []
     for log in logs:
-        os.makedirs('%s/services/%s'%(topdir,log), 0755)
-    os.makedirs('%s/messages'%topdir, 0755)
-    os.makedirs('%s/logs'%topdir, 0755)
+        dirs.append('%s/services/%s' % (topdir,log))
+    dirs.append('%s/messages' % topdir)
+    dirs.append('%s/logs' % topdir)
+
+    for p in dirs:
+        if os.path.exists(p):
+            if not os.path.isdir(p) or not os.access(p, os.W_OK):
+                sys.stderr.write("ERROR: Access denied to '%s'.\n" % p)
+                sys.exit(2)
+        else:
+            os.makedirs(p, 0755)
 
 
 def writeServiceMapping(topdir, maps):
@@ -95,8 +103,9 @@ def writeDBFiles(topdir, names2paths):
 
 
 REGPATH_EVENTLOG='$$$PROTO.HIV/ControlSet001/Services/Eventlog'
-PATH_REGLOOKUP='/home/tim/bin/reglookup'
-PATH_RIPDLL='/home/tim/projects/grok-evt/bin/ripdll'
+PATH_REGLOOKUP='reglookup'
+#XXX: rely on path
+PATH_RIPDLL='/home/tim/projects/grokevt/trunk/bin/ripdll'
 
 
 if len(sys.argv) < 3:
@@ -114,6 +123,7 @@ print "Reading registry for service information..."
 logs_query=(PATH_REGLOOKUP,"-tKEY","-f%s" % REGPATH_EVENTLOG, PATH_REGISTRY)
 child_proc = popen2.Popen3(logs_query, 1)
 
+#XXX: Badly need to check for return codes on reglookup calls
 # First, identify all log types by grabbing all keys under the eventlog key
 log_types = {}
 prefix_len = len(REGPATH_EVENTLOG)
