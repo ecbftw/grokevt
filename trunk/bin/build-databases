@@ -27,7 +27,7 @@ import grokevt
 
 # XXX: need better usage statement.
 def usage():
-    print "build-databases <CONFIG_DIR> <CONFIG_PROFILE> <OUTPUT_DIR>"
+    print "build-databases <CONFIG_PROFILE> <OUTPUT_DIR>"
     sys.exit(1)
 
 
@@ -111,15 +111,14 @@ PATH_REGLOOKUP='reglookup'
 PATH_RIPDLL='ripdll'
 
 
-if len(sys.argv) != 4:
+if len(sys.argv) != 3:
     usage()
 
-PATH_CONFIG = sys.argv[1]
-CONFIG_PROFILE = sys.argv[2]
-PATH_OUTPUT = sys.argv[3]
+CONFIG_PROFILE = sys.argv[1]
+PATH_OUTPUT = sys.argv[2]
 
 print "Loading configuration..."
-config = grokevt.grokevtConfig(PATH_CONFIG, CONFIG_PROFILE)
+config = grokevt.grokevtConfig(grokevt.PATH_CONFIG, CONFIG_PROFILE)
 
 print "Reading registry for service information..."
 logs_query=(PATH_REGLOOKUP,"-tKEY","-f%s" % REGPATH_EVENTLOG,

@@ -68,3 +68,6 @@ class grokevtConfig:
                                  +" file '%s'.\n" % fp)
         
         return ret_val
+
+
+### Below this line are build-time settings. ###
