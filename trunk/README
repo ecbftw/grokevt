@@ -1,0 +1,22 @@
+GrokEVT is an collection of scripts built for reading Windows NT(tm)
+event log files.  GrokEVT is released under the GNU GPL, and is
+implemented in Python.
+
+
+Installation
+============
+Please see the file INSTALL in this directory.
+
+
+Using
+=====
+A guide on how to get started can be found in:
+  doc/grokevt.txt
+
+or in the man page grokevt(1) after installation.
+
+
+Other
+=====
+If you have any other questions, please see the project website:
+  http://www.sentinelchicken.org/projects/grokevt/

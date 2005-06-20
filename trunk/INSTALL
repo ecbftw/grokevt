@@ -1,0 +1,33 @@
+Building
+========
+
+For most installations, this is as simple as:
+
+ make
+
+which will create the build/ directory with all install-ready items
+neatly arranged.  If you desire to change the path of the configuration
+files, you will want to instead set the ETC_PREFIX variable:
+
+ make ETC_PREFIX=/path/to/etc
+
+This path defaults to '/usr/local/etc'.
+
+
+Installing
+==========
+Installation is typically as simple as:
+
+ make install
+
+If you wish to override any of the installation prefixes (please see the
+top-level make file for all available paths), you'll need to specify
+those on the command line as well.  By default, everything installs
+somewhere under '/usr/local'.  If you wanted to change this to '/usr',
+you could do:
+
+  make PREFIX=/usr install
+
+If you just want to override the ETC_PREFIX, you need to override it
+during build *and* during install.  (Sorry, this will be fixed at some
+point.)

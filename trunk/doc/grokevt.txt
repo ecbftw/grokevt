@@ -1,0 +1,33 @@
+GrokEVT
+
+
+=NAME=
+	GrokEVT - a collection of scripts built for reading windows
+	event log files.
+
+
+=DESCRIPTION=
+	
+=USING=
+	Using GrokEVT on a set of windows partitions is a three stage
+	process.  One must first mount the partitions and configure the
+	system's profile.  Next, build-databases(1) must be run to
+	extract the necessary information from these partitions.
+	Finally, using these databases, evt-parser(1) may be run to
+	convert the logs to something useful.
+
+
+=EXAMPLES=
+
+=BUGS=
+
+=CREDITS=
+
+=LICENSE=
+	Please see the file "LICENSE" included with this software
+	distribution.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License version 2 for more details.
