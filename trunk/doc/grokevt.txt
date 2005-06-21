@@ -11,10 +11,10 @@ GrokEVT
 =USING=
 	Using GrokEVT on a set of windows partitions is a three stage
 	process.  One must first mount the partitions and configure the
-	system's profile.  Next, build-databases(1) must be run to
+	system's profile.  Next, grokevt-builddb(1) must be run to
 	extract the necessary information from these partitions.
-	Finally, using these databases, evt-parser(1) may be run to
-	convert the logs to something useful.
+	Finally, grokevt-parselog(1) may be run to use this information
+	to convert the logs to something useful.
 
 
 =EXAMPLES=

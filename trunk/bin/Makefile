@@ -2,18 +2,18 @@
 
 ################################################################################
 
-BUILD_DATABASES=$(BUILD_BIN)/build-databases
-EVT_PARSER=$(BUILD_BIN)/evt-parser
-RIPDLL=$(BUILD_BIN)/ripdll
-FILES=$(BUILD_DATABASES) $(EVT_PARSER) $(RIPDLL)
+BUILDDB=$(BUILD_BIN)/grokevt-builddb
+PARSELOG=$(BUILD_BIN)/grokevt-parselog
+RIPDLL=$(BUILD_BIN)/grokevt-ripdll
+FILES=$(BUILDDB) $(PARSELOG) $(RIPDLL)
 
 all: $(FILES)
 
-$(BUILD_DATABASES): build-databases
-	cp build-databases $(BUILD_DATABASES)
+$(BUILDDB): grokevt-builddb
+	cp grokevt-builddb $(BUILDDB)
 
-$(EVT_PARSER): evt-parser
-	cp evt-parser $(EVT_PARSER)
+$(PARSELOG): grokevt-parselog
+	cp grokevt-parselog $(PARSELOG)
 
-$(RIPDLL): ripdll
-	cp ripdll $(RIPDLL)
+$(RIPDLL): grokevt-ripdll
+	cp grokevt-ripdll $(RIPDLL)

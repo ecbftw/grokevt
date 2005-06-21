@@ -38,13 +38,13 @@ import csv
 
 def usage():
     print "USAGE:"
-    print "  %s <DATABASE_DIR> [<LOG_TYPE>]" % sys.argv[0]
+    print "  %s <DATABASE_DIR> [<LOG_TYPE>]" % os.path.basename(sys.argv[0])
     print
     print "This program parses a windows event log and prints a text version"
     print "of the log to stdout."
     print 
     print "DATABASE_DIR The location of the directory tree that was previously"
-    print "             created by build-databases."
+    print "             created by grokevt-builddb(1)."
     print
     print "LOG_TYPE     The (case-sensitive) windows log type.  Most commonly,"
     print "             one of:"

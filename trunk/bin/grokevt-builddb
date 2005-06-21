@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# This script builds message databases for use by evt-parser.
+# This script builds message databases for use by grokevt-parselog.
 #
 # Copyright (C) 2005 Timothy D. Morgan
 #
@@ -27,8 +27,8 @@ import grokevt
 
 # XXX: need better usage statement.
 def usage():
-    print "build-databases <CONFIG_PROFILE> <OUTPUT_DIR>"
-    sys.exit(1)
+    print "USAGE:"
+    print "  %s <CONFIG_PROFILE> <OUTPUT_DIR>" % os.path.basename(sys.argv[0])
 
 
 def windowsPathToUnixPath(path_list, variables, drives):
@@ -108,11 +108,12 @@ def writeDBFiles(topdir, names2paths):
 # XXX: is this right?  Is there a better way to find the right ControlSet?
 REGPATH_EVENTLOG='$$$PROTO.HIV/ControlSet001/Services/Eventlog'
 PATH_REGLOOKUP='reglookup'
-PATH_RIPDLL='ripdll'
+PATH_RIPDLL='grokevt-ripdll'
 
 
 if len(sys.argv) != 3:
     usage()
+    sys.exit(1)
 
 CONFIG_PROFILE = sys.argv[1]
 PATH_OUTPUT = sys.argv[2]

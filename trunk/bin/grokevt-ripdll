@@ -31,6 +31,12 @@ import traceback
 import anydbm
 
 
+#XXX: need better usage statement
+def usage():
+    print "USAGE:"
+    print "  %s <INPUT_DLL> <OUTPUT_DB>" % os.path.basename(sys.argv[0])
+
+
 def unpack(fmt,f):
     return struct.unpack(fmt,f.read(struct.calcsize(fmt)))
 
@@ -187,9 +193,8 @@ def dump_exe(f):
     return None
 
 
-#XXX: need usage statement
 if len(sys.argv) != 3:
-    print("ERROR: requires exactly 2 arguments.")
+    usage()
     sys.exit(1)
 
 dll_file = sys.argv[1]
