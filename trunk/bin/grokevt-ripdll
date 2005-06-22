@@ -4,7 +4,7 @@
 # message resources out of the .rsrc section.  They are then written to
 # a database file.
 #
-# Original code borrowed from the pymavis project.
+# Original PE header code borrowed from the pymavis project.
 # For more information, see: http://www.mplayerhq.hu/~arpi/pymavis/
 #
 # Copyright (C) 2005 Timothy D. Morgan
@@ -31,10 +31,13 @@ import traceback
 import anydbm
 
 
-#XXX: need better usage statement
 def usage():
     print "USAGE:"
     print "  %s <INPUT_DLL> <OUTPUT_DB>" % os.path.basename(sys.argv[0])
+    print
+    print "grokevt-ripdll is a tool for extracting message resources"
+    print "from a PE-formatted file.  Please see the man page for more"
+    print "information." 
 
 
 def unpack(fmt,f):

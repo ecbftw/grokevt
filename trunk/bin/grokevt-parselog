@@ -38,40 +38,12 @@ import csv
 
 def usage():
     print "USAGE:"
-    print "  %s <DATABASE_DIR> [<LOG_TYPE>]" % os.path.basename(sys.argv[0])
+    print "  %s <DATABASE_DIR> [<LOG_TYPE>]"\
+          % os.path.basename(sys.argv[0])
     print
-    print "This program parses a windows event log and prints a text version"
-    print "of the log to stdout."
-    print 
-    print "DATABASE_DIR The location of the directory tree that was previously"
-    print "             created by grokevt-builddb(1)."
-    print
-    print "LOG_TYPE     The (case-sensitive) windows log type.  Most commonly,"
-    print "             one of:"
-    print "               Application"
-    print "               Security"
-    print "               System"
-    print "             If not specified, a list of available log types is"
-    print "             printed."
-    print
-    print
-    print "CREDITS"
-    print
-    print "Originally written by Jamie French.  Converted to Python"
-    print "and extended by Timothy Morgan."
-    print
-    print "Copyright (C) 2005 Timothy Morgan"
-    print "Copyright (C) 2004 Jamie French"
-    print
-    print "This program is free software; you can redistribute it and/or"
-    print "modify it under the terms of the GNU General Public License"
-    print "as published by the Free Software Foundation version 2 of the"
-    print "License."
-    print
-    print "This program is distributed in the hope that it will be useful,"
-    print "but WITHOUT ANY WARRANTY; without even the implied warranty of"
-    print "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the"
-    print "GNU General Public License for more details."
+    print "This program parses a windows event log and prints a CSV"
+    print "version of the log to stdout.  Please see the man page for"
+    print "more information."
 
 
 # Returns a string which contains s, except for non-printable or

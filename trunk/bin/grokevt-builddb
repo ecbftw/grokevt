@@ -24,11 +24,14 @@ import anydbm
 import grokevt
 
 
-
-# XXX: need better usage statement.
 def usage():
     print "USAGE:"
-    print "  %s <CONFIG_PROFILE> <OUTPUT_DIR>" % os.path.basename(sys.argv[0])
+    print "  %s <CONFIG_PROFILE> <OUTPUT_DIR>"\
+          % os.path.basename(sys.argv[0])
+    print
+    print "grokevt-builddb builds a database tree based on a single"
+    print "windows system for the purpose of event log conversion."
+    print "Please see the man page for more information."
 
 
 def windowsPathToUnixPath(path_list, variables, drives):
