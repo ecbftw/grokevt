@@ -15,6 +15,34 @@ GrokEVT
 	extract the necessary information from these partitions.
 	Finally, grokevt-parselog(1) may be run to use this information
 	to convert the logs to something useful.
+	
+	**Mounting and Configuration**
+	This is the most labor-intensive step of the process.  There are
+	several technical reasons why this can't be simpler, and it is
+	unlikely many will be resolved anytime soon. (Sorry, blame the
+	vendor who produced these logs that you wish to convert.)
+	
+	First mount the partitions used by your windows system.
+	Specifically, mount any partition that has software installed on
+	it.  (You can probably get away with not mounting ones with no
+	software, or no software that produces events in the event log.)
+	This includes windows shares, if you have any with software
+	installed on them.
+	
+	The key point when mounting partitions or shares, is that you
+	must mount them with case-insensitive filenames.  To do this in
+	Linux, you should be able to use the NTFS option 'posix=0', or
+	with type vfat, 'posix' should do.  On FreeBSD, it appears one
+	can use the -i option with NTFS and mount_ntfs, but this hasn't
+	been tested.  (More research is necessary in this area.  Please
+	let me know if case-insensitivity is available on other *NIXes
+	and what the options are.)  All of this of course depends on
+	your version of mount and related software.  See mount(8) for
+	more information.
+
+	Once you have all necessary filesystems mounted for your windows
+	image, you need to configure GrokEVT so it knows where
+	everything is.
 
 
 =EXAMPLES=
