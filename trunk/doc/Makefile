@@ -14,6 +14,8 @@ build:
 		do cp $(value sh-var-F) $(BUILD_DOC)/$(value sh-var-F); done
 
 install:
+	mkdir -p $(MAN_PREFIX)/man1
+	mkdir -p $(MAN_PREFIX)/man7
 	cp -sf $(DOC_PREFIX)/man/man1/* $(MAN_PREFIX)/man1
 	cp -sf $(DOC_PREFIX)/man/man7/* $(MAN_PREFIX)/man7
 
