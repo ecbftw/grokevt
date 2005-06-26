@@ -108,12 +108,12 @@ def writeDBFiles(topdir, names2paths):
         # XXX: does the return code from wait() matter?
         child_proc.wait()
         for l in child_proc.fromchild.readlines():
-            sys.stderr.write("WARNING: while reading %s and writing %s,"\
-                             +" grokevt-ripdll returned: %s\n"\
+            sys.stderr.write(("WARNING: while reading %s and writing %s,"\
+                              +" grokevt-ripdll returned: %s\n")\
                              % (npi[1], outdb, l))
         for l in child_proc.childerr.readlines():
-            sys.stderr.write("WARNING: while reading %s and writing %s,"\
-                             +" grokevt-ripdll returned: %s\n"\
+            sys.stderr.write(("WARNING: while reading %s and writing %s,"\
+                              +" grokevt-ripdll returned: %s\n")\
                              % (npi[1], outdb, l))
 
 
