@@ -6,7 +6,7 @@ MAN_PAGES=1/grokevt-builddb.1 1/grokevt-parselog.1\
 
 build:
 	mkdir -p $(BUILD_DOC)/devel
-	cp *.txt $(BUILD_DOC)
+	cp *.t2t $(BUILD_DOC)
 	cp devel/*.txt $(BUILD_DOC)/devel
 	mkdir -p $(BUILD_DOC)/man/man1
 	mkdir -p $(BUILD_DOC)/man/man7
@@ -22,7 +22,7 @@ install:
 
 #XXX: Used during release only
 $(foreach p,$(MAN_PAGES),man/man$(p)):
-	txt2tags --mask-email -t man -o $@ $(notdir $@).txt
+	txt2tags --mask-email -t man -o $@ $(notdir $@).t2t
 
 $(foreach p,$(MAN_PAGES),man/man$(p).gz): $(foreach p,$(MAN_PAGES),man/man$(p))
 	gzip -c -9 $(subst .gz,,$@) > $@ && rm $(subst .gz,,$@)
