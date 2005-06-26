@@ -23,6 +23,8 @@ install:
 #XXX: Used during release only
 $(foreach p,$(MAN_PAGES),man/man$(p)):
 	txt2tags --mask-email -t man -o $@ $(notdir $@).t2t
+	txt2tags --mask-email -t txt\
+		-o $(basename $(notdir $@)).txt $(notdir $@).t2t
 
 $(foreach p,$(MAN_PAGES),man/man$(p).gz): $(foreach p,$(MAN_PAGES),man/man$(p))
 	gzip -c -9 $(subst .gz,,$@) > $@ && rm $(subst .gz,,$@)
