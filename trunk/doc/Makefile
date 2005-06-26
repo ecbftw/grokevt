@@ -15,7 +15,7 @@ build:
 
 install:
 	cp -sf $(DOC_PREFIX)/man/man1/* $(MAN_PREFIX)/man1
-	cp -sf $(DOC_PREFIX)/man/man7/* $(MAN_PREFIX)/man1
+	cp -sf $(DOC_PREFIX)/man/man7/* $(MAN_PREFIX)/man7
 
 
 #XXX: Used during release only
