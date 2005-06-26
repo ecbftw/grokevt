@@ -36,3 +36,4 @@ release: $(foreach p,$(MAN_PAGES),man/man$(p).gz)
 release-clean:
 	rm -f $(foreach p,$(MAN_PAGES),man/man$(p))
 	rm -f $(foreach p,$(MAN_PAGES),man/man$(p).gz)
+	rm -f $(foreach p,$(MAN_PAGES),$(basename $(notdir $(p))).txt)

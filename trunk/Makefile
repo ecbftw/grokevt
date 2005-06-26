@@ -2,10 +2,13 @@
 
 # Installation prefixes.  Change to install elsewhere.
 
+PYTHON_VERSION:=`echo 'import sys;\
+	print "%d.%d" % (sys.version_info[0],sys.version_info[1])' | python`
+
 PREFIX=/usr/local
 BIN_PREFIX=$(PREFIX)/bin
 # XXX: this lib prefix must change...
-LIB_PREFIX=$(PREFIX)/bin
+LIB_PREFIX:=/usr/local/lib/python$(PYTHON_VERSION)/site-packages
 ETC_PREFIX=$(PREFIX)/etc
 DOC_PREFIX=$(PREFIX)/share/doc/grokevt
 MAN_PREFIX=$(PREFIX)/man
@@ -48,4 +51,3 @@ $(BUILD_TREE):
 
 clean:
 	rm -rf $(BUILD)
-
