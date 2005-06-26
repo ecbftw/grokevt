@@ -124,12 +124,14 @@ def dump_pe(f,startoff,exesize):
             (rsrc_flags,date,majver,minver,
              num_dir_names,num_dir_ids) = unpack("<IIHHHH", f)
 
-            # XXX: Comment this.
+            # XXX: Comment all of this.
             type_offset = f.tell()
             msg_type_offset = find_name_dir(f, num_dir_names, num_dir_ids)
             if msg_type_offset:
                 f.seek(sect_off+msg_type_offset)
             else:
+                # XXX: Why does this happen?  For most of the files it occurs
+                #      on, there appear to be no message resources...
                 sys.stderr.write("Could not find msg_type_offset.\n");
                 return None
             

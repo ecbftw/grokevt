@@ -105,21 +105,25 @@ def writeDBFiles(topdir, names2paths):
         outdb = "%s/messages/%s" % (topdir, npi[0])
         db_call = (PATH_RIPDLL, npi[1], outdb)
         child_proc = popen2.Popen3(db_call, 1)
-        # XXX: does the return code from wait() matter?
-        child_proc.wait()
+        
+        child_ret = child_proc.wait()
+        if child_ret > 0:
+            sys.stderr.write(("WARNING: grokevt-ripdll returned code: %d."
+                              +"  Is it in your path?\n") % child_ret)
+        
         for l in child_proc.fromchild.readlines():
-            sys.stderr.write(("WARNING: while reading %s and writing %s,"\
+            sys.stderr.write(("WARNING: while reading %s and writing %s,"
                               +" grokevt-ripdll returned: %s\n")\
-                             % (npi[1], outdb, l))
+                             % (npi[1], outdb, l.strip()))
         for l in child_proc.childerr.readlines():
-            sys.stderr.write(("WARNING: while reading %s and writing %s,"\
+            sys.stderr.write(("WARNING: while reading %s and writing %s,"
                               +" grokevt-ripdll returned: %s\n")\
-                             % (npi[1], outdb, l))
+                             % (npi[1], outdb, l.strip()))
 
 
 # XXX: is this right?  Is there a better way to find the right ControlSet?
 REGPATH_EVENTLOG='$$$PROTO.HIV/ControlSet001/Services/Eventlog'
-# XXX: should these be changed to an absolute paths?
+# XXX: should these be changed to absolute paths?
 PATH_REGLOOKUP='reglookup'
 PATH_RIPDLL='grokevt-ripdll'
 
@@ -139,10 +143,15 @@ logs_query=(PATH_REGLOOKUP,"-tKEY","-f%s" % REGPATH_EVENTLOG,
             config.registry_path)
 child_proc = popen2.Popen3(logs_query, 1)
 
-#XXX: Badly need to check for return codes on reglookup calls
 # First, identify all log types by grabbing all keys under the eventlog key
 log_types = {}
 prefix_len = len(REGPATH_EVENTLOG)
+
+child_ret = child_proc.wait()
+if child_ret > 0:
+    sys.stderr.write(("WARNING: reglookup returned code: %d."
+                      +"  Is reglookup in your path?\n") % child_ret)
+
 l = child_proc.fromchild.readline()
 while l != '':
     l = l[prefix_len:].lstrip('/').split('/')[0].split(':')[0].strip()
@@ -164,6 +173,11 @@ for lt in log_types.keys():
                  "-f%s/%s/File" % (REGPATH_EVENTLOG,lt),
                  config.registry_path)
     child_proc = popen2.Popen3(evt_query, 1)
+
+    child_ret = child_proc.wait()
+    if child_ret > 0:
+        sys.stderr.write("WARNING: reglookup returned code: %d.\n" % child_ret)
+
     l = child_proc.fromchild.readline().split('=')[1].strip()
     evt_files[lt] = windowsPathToUnixPath(l, config.path_vars,
                                           config.drive_mapping)[0]
@@ -175,12 +189,17 @@ for lt in log_types.keys():
                   "-f%s/%s/Sources" % (REGPATH_EVENTLOG,lt),
                   config.registry_path)
     child_proc = popen2.Popen3(logs_query, 1)
+
+    child_ret = child_proc.wait()
+    if child_ret > 0:
+        sys.stderr.write("WARNING: reglookup returned code: %d.\n" % child_ret)
+
     log_types[lt] = {}
     log_types[lt]["event"] = {}
     log_types[lt]["category"] = {}
     log_types[lt]["parameter"] = {}
     
-
+    
     # For each service under this log type, grab the associated event,
     # category, and parameter message file lists.
     l = child_proc.fromchild.readline()
@@ -199,7 +218,12 @@ for lt in log_types.keys():
 
         s = s.lower()
         child_proc = popen2.Popen3(dlls_query, 1)
-        # XXX: does the return code from wait() matter?
+
+        child_ret = child_proc.wait()
+        if child_ret > 0:
+            sys.stderr.write("WARNING: reglookup returned code: %d.\n"
+                             % child_ret)
+
         child_proc.wait()
         for l in child_proc.childerr.readlines():
             sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
