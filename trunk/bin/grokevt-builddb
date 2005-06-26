@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 # This script builds message databases for use by grokevt-parselog.
 #
@@ -102,14 +102,24 @@ def writeServiceMapping(topdir, maps):
 
 def writeDBFiles(topdir, names2paths):
     for npi in names2paths.items():
-        db_call = (PATH_RIPDLL, npi[1], "%s/messages/%s" % (topdir, npi[0]))
-        #XXX: Catch return codes & stderr
+        outdb = "%s/messages/%s" % (topdir, npi[0])
+        db_call = (PATH_RIPDLL, npi[1], outdb)
         child_proc = popen2.Popen3(db_call, 1)
+        # XXX: does the return code from wait() matter?
         child_proc.wait()
+        for l in child_proc.fromchild.readlines():
+            sys.stderr.write("WARNING: while reading %s and writing %s,"\
+                             +" grokevt-ripdll returned: %s\n"\
+                             % (npi[1], outdb, l))
+        for l in child_proc.childerr.readlines():
+            sys.stderr.write("WARNING: while reading %s and writing %s,"\
+                             +" grokevt-ripdll returned: %s\n"\
+                             % (npi[1], outdb, l))
 
 
 # XXX: is this right?  Is there a better way to find the right ControlSet?
 REGPATH_EVENTLOG='$$$PROTO.HIV/ControlSet001/Services/Eventlog'
+# XXX: should these be changed to an absolute paths?
 PATH_REGLOOKUP='reglookup'
 PATH_RIPDLL='grokevt-ripdll'
 
@@ -142,10 +152,8 @@ while l != '':
         log_types[l] = None
     l = child_proc.fromchild.readline()
 
-l = child_proc.childerr.readline()
-while l != '':
-    sys.stderr.write("ERROR: %s reported: %s\n" % (PATH_REGLOOKUP, l))
-    l = child_proc.childerr.readline()
+for l in child_proc.childerr.readlines():
+    sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
 
 # Now, for each log type, grab list of all services in the Sources MULTI_SZ
 files = {}
@@ -159,6 +167,8 @@ for lt in log_types.keys():
     l = child_proc.fromchild.readline().split('=')[1].strip()
     evt_files[lt] = windowsPathToUnixPath(l, config.path_vars,
                                           config.drive_mapping)[0]
+    for l in child_proc.childerr.readlines():
+        sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
     
     logs_query = (PATH_REGLOOKUP,
                   "-tMULTI_SZ",
@@ -173,9 +183,10 @@ for lt in log_types.keys():
 
     # For each service under this log type, grab the associated event,
     # category, and parameter message file lists.
-    #XXX: record/print child errors
     l = child_proc.fromchild.readline()
     services = l.split('=')[1].split('|')
+    for l in child_proc.childerr.readlines():
+        sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
     for s in services:
         s = s.strip()
         #XXX: decode service names (s), one at a time
@@ -188,7 +199,10 @@ for lt in log_types.keys():
 
         s = s.lower()
         child_proc = popen2.Popen3(dlls_query, 1)
-        #XXX: record/print child errors
+        # XXX: does the return code from wait() matter?
+        child_proc.wait()
+        for l in child_proc.childerr.readlines():
+            sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
         lines = child_proc.fromchild.readlines()
         for l in lines:
             # This is just to speed up the find() calls

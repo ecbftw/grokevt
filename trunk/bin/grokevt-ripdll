@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 # This script parses a PE formatted file (EXE/DLL) and extracts the
 # message resources out of the .rsrc section.  They are then written to

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 # This script will take an input Windows Event Log and parse it to
 # stdout as ASCII text.  This is particularly useful for forensics being

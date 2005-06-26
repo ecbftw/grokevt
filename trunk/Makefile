@@ -1,14 +1,14 @@
 # $Id$
 
-# Installation prefixes.  Change to install elsewhere.
-
+# This extracts the major and minor version of the python executable in
+# the current PATH.
 PYTHON_VERSION:=`echo 'import sys;\
 	print "%d.%d" % (sys.version_info[0],sys.version_info[1])' | python`
 
+# Installation prefixes.  Change to install elsewhere.
 PREFIX=/usr/local
+LIB_PREFIX:=$(PREFIX)/lib/python$(PYTHON_VERSION)/site-packages
 BIN_PREFIX=$(PREFIX)/bin
-# XXX: this lib prefix must change...
-LIB_PREFIX:=/usr/local/lib/python$(PYTHON_VERSION)/site-packages
 ETC_PREFIX=$(PREFIX)/etc
 DOC_PREFIX=$(PREFIX)/share/doc/grokevt
 MAN_PREFIX=$(PREFIX)/man
