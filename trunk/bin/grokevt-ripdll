@@ -47,7 +47,7 @@ def unpack(fmt,f):
 def find_name_dir(f,num_dir_names,num_dir_ids):
     ret_val = None
     f.seek(f.tell()+8*num_dir_names)
-    for i in range(0,num_dir_ids+1):
+    for i in range(0,num_dir_ids):
         (type_id, type_offset) = unpack("<II", f)
         if type_id == 11:     # RT_MESSAGE constant
             ret_val = type_offset & 0x7FFFFFFF
