@@ -11,7 +11,7 @@ Please see the file INSTALL in this directory.
 Using
 =====
 A guide on how to get started can be found in:
-  doc/grokevt.7.txt
+  doc/grokevt.txt
 
 or in the man page grokevt(7) after installation.
 
