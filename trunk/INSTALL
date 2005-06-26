@@ -1,6 +1,22 @@
 Prerequisites
 =============
-XXX
+In order to install this package, you must have the following already
+set up on your system:
+ - Python 2.3+
+ - Make (tested with GNU Make)
+
+In order to use this software you also need:
+ - RegLookup
+
+Earlier versions of Python may work, but they have not yet been tested.
+
+To obtain RegLookup, please see the project page at:
+  http://www.sentinelchicken.org/projects/reglookup/
+
+You do not need to have RegLookup installed before installing this
+software, but you will need to have it installed and in your PATH
+whenver you run grokevt-builddb(1).
+
 
 Building
 ========
