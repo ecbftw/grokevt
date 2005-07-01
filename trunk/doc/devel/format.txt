@@ -1,54 +1,78 @@
 Windows Event Log Entry Format.
 
-0: 32bits, fixed value
+0: 32bits, little endian
+   Length of record, in bytes, including these 4 bytes
+
+1: 32bits, fixed value
    Message Separator, with value:
    1001100011001100100110001100101b or 0x4c664c65 or "LfLe"
 
-1: 32bits, little endian
-   Message Number (4 bytes - Padded with null characters
-   from left to right to fill in the full 4 bytes. It is in
-   little endian byte order)
-
 2: 32bits, little endian
-   Date Created UTC, in seconds since the epoch(unix?).  
+   Message Number
 
 3: 32bits, little endian
-   Date Written UTC, in seconds since the epoch(unix?).
+   Date Created UTC, in seconds since the epoch(unix?).  
 
 4: 32bits, little endian
+   Date Written UTC, in seconds since the epoch(unix?).
+
+5: 32bits, little endian
    Event ID and Offset
    High two bytes are the offset into the windoze DLL which holds the
    messages.  The two low order bytes are what is displayed to the user
    as the Event ID.  The number taken as a whole is used to grab the
    message from the DLL using the windoze FormatMessage() call.
 
-5: 8bits
-   Event Type (1 byte - number - used as index to retrieve 'Event Name')
+6: 16bits, little endian
+   Event Type
+   One of 5 values.
 
-6: 16bits, little endian?
-   String Count (2 bytes - The number of strings in the event?)
+7: 16bits, little endian
+   String Count 
+   The number of strings in the event? Not always accurate?
 
-7: 16bits, little endian?
+8: 16bits, little endian
    Category
 
-10: 128bits, ??
+9: 16bits
+   UNKNOWN
+
+10: 32bits
     UNKNOWN
 
-12: variable length fields
-    The resources (strings, fields) used when filling in the template
-    that is pulled from the windoze dll (using field 4).  Number and
-    values of fields here vary, but the first two are (almost?) always
-    the same: 
+11: 32bits, little endian
+    Strings Offset
+    Pointer to a sequence of NULL terminated unicode strings
+    (NULL == '\x00\x00') used in the message template.  
+    This pointer is relative to the very beginning of the record.
+    The end of the strings section appears to be the beginning of the
+    other data section.
 
-    12.1: NULL terminated unicode string (NULL == '\x00\x00')
+12: 32bits, little endian
+    SID string length
+    Set to 0 if it isn't included.
+
+13: 32bits, little endian
+    SID pointer
+    This pointer is relative to the very beginning of the record.
+
+14: 32bits, little endian
+    Other data length
+    Length of supplimentary data included in log.  
+    0 if none exists.
+
+15: 32bits, little endian
+    Other data pointer
+    This pointer is relative to the very beginning of the record.
+
+16: variable length fields
+    16.1: NULL terminated unicode string (NULL == '\x00\x00')
           The windoze log source.  This value is used to look up (using
           the registry) what DLLs need to be searched for the proper
           EventID message template.  
-    12.2: NULL terminated unicode string (NULL == '\x00\x00')
+
+    16.2: NULL terminated unicode string (NULL == '\x00\x00')
           Computer Name which generated the log entry.
 
-    And sometimes there is a field:
-    12.3: 24byte? fixed width
-          User SID.  The binary representation of a user's SID.  A
-          special template indicator in the log templates must be set up
-          to read this type of value.
+    16.3: General buffer.  Everything 12.2 is pointed to by the
+          pointers in fields 11, 13, and 15.

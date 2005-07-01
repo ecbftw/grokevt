@@ -35,6 +35,14 @@ import re
 import time
 import csv
 
+# XXX: This mapping may not be entirely accurate.  In particular,
+#      FailureAudit and SuccessAudit were educated guesses.  The others
+#      appear to be correct.
+eventTypeEnum = ('FailureAudit',
+                 'Error',
+                 'Warning',
+                 'SuccessAudit',
+                 'Information')
 
 def usage():
     print "USAGE:"
@@ -63,14 +71,31 @@ def quoteBinaryInString(s, specials="\\"):
 
 # Reference:
 #  http://blogs.msdn.com/oldnewthing/archive/2004/03/15/89753.aspx
-def binSIDtoASCII(rev,dashes,b0,b1,b2,b3,b4,b5,rest):
-   auth = (b0<<40) | (b1<<32) | (b2<<24) | (b3<<16) | (b4<<8) | b5
-   result = "S-%d-%d" % (rev, auth)
-   for i in range(0,dashes):
-       if(i < len(rest)):
-           result = "%s-%s" % (result, rest[i])
+#def binSIDtoASCII(rev,dashes,b0,b1,b2,b3,b4,b5,rest):
+#   auth = (b0<<40) | (b1<<32) | (b2<<24) | (b3<<16) | (b4<<8) | b5
+#   result = "S-%d-%d" % (rev, auth)
+#   for i in range(0,dashes):
+#       if(i < len(rest)):
+#           result = "%s-%s" % (result, rest[i])
+#
+#   return result
+def binSIDtoASCII(sid_str):
+   auth = ((ord(sid_str[2])<<40)
+           | (ord(sid_str[3])<<32)
+           | (ord(sid_str[4])<<24)
+           | (ord(sid_str[5])<<16)
+           | (ord(sid_str[6])<<8)
+           | ord(sid_str[7]))
+   result = "S-%d-%d" % (ord(sid_str[0]), auth)
+   rest = sid_str[8:]
+   for i in range(0,ord(sid_str[1])):
+       if len(rest) >= 4:
+           next_int = struct.unpack('<I', rest[:4])[0]
+           rest = rest[4:]
+           result = "%s-%d" % (result, next_int)
 
    return result
+
 
 # Reference:
 #  http://msdn.microsoft.com/library/en-us/winui/winui/windowsuserinterface/resources/strings/stringreference/stringfunctions/wsprintf.asp
@@ -170,7 +195,6 @@ def formatMessage(fmt, vars):
                                 state = 0
                                 arg_num = ''
         elif state == 3:
-            # XXX: implement extended format string with wsprintf
             if c == '!':
                 state = 0
                 ret_val += wsprintf(extended_fmt, vars[arg_index])
@@ -208,6 +232,99 @@ class messageRepository:
         return ret_val
 
 
+def getRecord(f):
+    size_str = f.read(4)
+    if len(size_str) < 4:
+        return None
+    (size,) = struct.unpack('<I', size_str)
+    
+    fixed_fmt = '<IIIIHHHHHHIIIIII'
+    fixed_fmt_len = struct.calcsize(fixed_fmt)
+
+    rec_str = f.read(size-4)
+    if len(rec_str) < fixed_fmt_len:
+        return [-1,'','','',
+                os.path.basename(sys.argv[0]),
+                '','-1','','','',
+                "There was an error processing this event."\
+                + "Binary record is not long enough.",
+                '','']
+    
+    variable_str_len = len(rec_str) - fixed_fmt_len
+    (lfle,msg_num,
+     date_created,date_written,
+     event_id,event_rva_offset,
+     event_type,strcount,
+     category,unknown,
+     closing_record_number,string_offset,
+     sid_len,sid_offset,
+     data_len,data_offset,
+     variable_str) = struct.unpack("%s%ds" % (fixed_fmt, variable_str_len),
+                                   rec_str)
+    # Grab source and computer fields
+    # XXX: Need to properly handle unicode.
+    source_end = variable_str.find('\x00\x00')
+    source = variable_str[:source_end].replace('\x00', '')
+    tmp = variable_str[source_end+2:]
+    computer_end = tmp.find('\x00\x00')
+    computer = tmp[:computer_end].replace('\x00', '')
+    tmp = None
+    
+    # Grab SID
+    sid = 'N/A'
+    if sid_len > 0:
+        sid_str = rec_str[sid_offset-4:sid_offset+sid_len-4]
+        sid = binSIDtoASCII(sid_str)
+
+    # Grab template variables
+    strs = []
+    if string_offset > 0:
+        strs = rec_str[string_offset-4:data_offset-4].split('\x00\x00')
+        # XXX: Need to properly handle unicode.
+        tmp_strs = []
+        for s in strs:
+            tmp_strs.append(s.replace('\x00', ''))
+        strs = tmp_strs
+        tmp_strs = None
+
+    # Grab binary data chunk
+    data = ''
+    if data_len > 0:
+        data = rec_str[data_offset-4:data_offset+data_len-4]
+    
+    # Retrieve and process message template
+    event_rva = "%.8X"%(event_rva_offset<<16|event_id)
+    message_template = msg_repo.getMessageTemplate(source, event_rva)
+    message = ''
+    if message_template:
+        message = formatMessage(message_template, strs)
+    else:
+        sys.stderr.write("WARNING: Couldn't find message"\
+                         +" template for EVENT_ID %d\n" % msg_num)
+
+    # Format fields and return
+    return [msg_num,
+            eventTypeEnum[event_type],
+            time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(date_created)),
+            time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(date_written)),
+            source,
+            category,
+            event_id,
+            event_rva,
+            sid,
+            computer,
+            message,
+            '|'.join(strs).strip('|'),
+            data]
+
+
+header_rec = ("MSG_NUM","EVENT_TYPE",
+              "DATE_CREATED","DATE_WRITTEN",
+              "SOURCE","CATEGORY",
+              "EVENT_ID","EVENT_RVA",
+              "USER","COMPUTER",
+              "MESSAGE","STRINGS","DATA")
+
 if ((len(sys.argv) != 3) and (len(sys.argv) != 2))\
        or (sys.argv[1] == '-h') or (sys.argv[1] == '--help'):
     usage()
@@ -221,107 +338,16 @@ if len(sys.argv) == 2:
     sys.exit(0)
 
 
-
 LOG=sys.argv[2]
 msg_repo = messageRepository(DB_PATH, LOG)
 
 evt_file = "%s/logs/%s.evt" % (DB_PATH, LOG)
 evt_handle = file(evt_file, "r")
-# First 4 bytes always seem to be 0x30,0x00,0x00,0x00, followed by the
-# delimiter, which can be skipped as well.
-# XXX: this needs to be read a record at a time, instead of all at once.
-entire_log=evt_handle.read()[8:]
-records=entire_log.split('\x4c\x66\x4c\x65')
-entire_log=None
 
-thecount=len(records)
 csvwriter = csv.writer(sys.stdout)
-csvwriter.writerow(("MSG_NUM","DATE_CREATED","DATE_WRITTEN","EVENT_RVA",
-                    "EVENT_ID","EVENT_TYPE","STR_COUNT",
-                    "CATEGORY","SID",
-                    "UNKNOWN_A","UNKNOWN_B","UNKNOWN_C","UNKNOWN_D",
-                    "SOURCE","SYSTEM","MESSAGE"))
-
-for rec in records:
-    # Default values
-    msgnum=-1
-    date_created=0
-    date_written=0
-    event_rva_offset=0
-    eventid=0
-    eventtype=''
-    strcount=''
-    category=''
-    (sid_rev,sid_dashes,
-     sid_b0,sid_b1,sid_b2,sid_b3,sid_b4,sid_b5)=(0,0,0,0,0,0,0,0)
-    rest=[]
-    unknown_a=''
-    unknown_b=''
-    unknown_c=''
-    unknown_d=''
-    msgstr_raw=''
-    source=''
-    computer=''
-    messages=[]
-    event_rva=''
-
-    #print "length: %d" % len(rec)
-    if len(rec) < 45:
-        source=sys.argv[0]
-        messages=["There was an error processing this event."\
-                  +"  Binary log not long enough."]
-    else:
-        # Field byte lengths: 4,4,4,2,1,1,1,2,2,8,4,4,4,4,var
-        unpack_fmt = '<IIIHHBHHBBBBBBBBIIII'
-        msg_len = len(rec) - struct.calcsize(unpack_fmt)
-        (msgnum,date_created,
-         date_written,eventid,
-         event_rva_offset,
-         eventtype,strcount,
-         category,
-         sid_rev,sid_dashes,sid_b0,sid_b1,sid_b2,sid_b3,sid_b4,sid_b5,
-         unknown_a,unknown_b,
-         unknown_c,unknown_d,
-         msgstr_raw) = struct.unpack("%s%ds" % (unpack_fmt, msg_len), rec)
-        event_rva = "%X"%(event_rva_offset<<16|eventid)
-        
-        # XXX: Properly handle unicode
-        msgstr_raw = msgstr_raw.lstrip('\x00')
-        next = msgstr_raw.find('\x00\x00')
-        i = 0
-        while next > -1:
-            if i == 0:
-                source = msgstr_raw[0:next].replace('\x00', '')
-            elif i == 1:
-                computer = msgstr_raw[0:next].replace('\x00', '')
-            else:
-                messages.append(msgstr_raw[0:next])
-            msgstr_raw = msgstr_raw[(next+2):]
-            i += 1
-            next = msgstr_raw.find('\x00\x00')
-        
-        for i in range(0,len(messages)):
-            messages[i] = messages[i].replace('\x00', '')
-            
-    row = [msgnum,
-           time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(date_created)),
-           time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(date_written)),
-           event_rva, eventid,
-           eventtype,strcount,
-           category,
-           binSIDtoASCII(sid_rev,sid_dashes,
-                         sid_b0,sid_b1,sid_b2,sid_b3,sid_b4,sid_b5, []),
-           unknown_a, unknown_b,
-           unknown_c, unknown_d,
-           source, computer]
-    message_template = msg_repo.getMessageTemplate(source, event_rva)
-    if message_template:
-        m = formatMessage(message_template, messages)
-        row.append(m)
-    else:
-        sys.stderr.write("WARNING: Couldn't find message"\
-                         +" template for message %d\n" % msgnum)
-        row.extend(messages)
-
-    row = map(quoteBinaryInString, row)
-    csvwriter.writerow(row)
+csvwriter.writerow(header_rec)
+rec = getRecord(evt_handle)
+while rec:
+    rec = map(quoteBinaryInString, rec)
+    csvwriter.writerow(rec)
+    rec = getRecord(evt_handle)

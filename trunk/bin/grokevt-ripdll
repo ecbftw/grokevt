@@ -215,7 +215,7 @@ messages = dump_exe(file(sys.argv[1], 'r'))
 if messages != None:
     db = anydbm.open(db_file, "n", 0644)
     for msg in messages.items():
-        db["%X"%msg[0]] = msg[1]
+        db["%.8X"%msg[0]] = msg[1]
     db.sync()
     db.close()
 
