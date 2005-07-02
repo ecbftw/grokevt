@@ -293,14 +293,14 @@ def getRecord(f):
         data = rec_str[data_offset-4:data_offset+data_len-4]
     
     # Retrieve and process message template
-    event_rva = "%.8X"%(event_rva_offset<<16|event_id)
+    event_rva = "%.8X"%(long(event_rva_offset)<<16|event_id)
     message_template = msg_repo.getMessageTemplate(source, event_rva)
     message = ''
     if message_template:
         message = formatMessage(message_template, strs)
     else:
         sys.stderr.write("WARNING: Couldn't find message"\
-                         +" template for EVENT_ID %d\n" % msg_num)
+                         +" template for event record #%d\n" % msg_num)
 
     # Format fields and return
     return [msg_num,
