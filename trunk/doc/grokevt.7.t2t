@@ -119,7 +119,7 @@ GrokEVT
 	record this information though, if later you find you are
 	missing a lot of message templates in your log output.
 
-	Now that you have finished this step, you have a fully extracted
+	Now that you have finished this step, you have fully extracted
 	all information needed to interpret the event logs.
 
 
