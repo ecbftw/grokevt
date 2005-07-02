@@ -60,10 +60,12 @@ grokevt-parselog
 
 
 =CREDITS=
-	Originally written by Jamie French.  
+	Originally written by Jamie French.
+
 	Converted to Python and extended by Timothy D. Morgan.
 
 	Copyright (C) 2005 Timothy D. Morgan
+
 	Copyright (C) 2004 Jamie French
 
 

@@ -49,11 +49,12 @@ grokevt-ripdll
 =CREDITS=
 	Original PE header code borrowed from the pymavis project.
 	For more information, see:
-	  http://www.mplayerhq.hu/~arpi/pymavis/ 
+		http://www.mplayerhq.hu/~arpi/pymavis/ 
 
 	Message resource parsing added by Timothy D. Morgan.
 
 	Copyright (C) 2005 Timothy D. Morgan
+
 	Copyright (C) 2004 A'rpi
 
 
