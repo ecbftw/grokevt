@@ -27,9 +27,11 @@ grokevt-parselog
 
 	LOG_TYPE	This is the windows name for the log.  By
 			default windows has the following logs:
+
 			  Application
 			  Security
 			  System
+
 			But others may have been created by third party
 			software.  If this option is omitted,
 			grokevt-parselog will print a list of all

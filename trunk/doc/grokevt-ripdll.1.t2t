@@ -24,14 +24,13 @@ grokevt-ripdll
 
 
 =ARGUMENTS=
-	INPUT_DLL	This is the PE formatted file to extract
-			resources from.	 (It doesn't need to have a .dll
-			extension, but is is most commonly used on
-			DLLs.)
+	INPUT_DLL  This is the PE formatted file to extract resources
+		   from. (It doesn't need to have a .dll extension, but
+		   is is most commonly used on DLLs.)
 
-	OUTPUT_DB	The database file to store the RVA->message
-			mapping in.  If this file already exists, it
-			will be overwritten.
+	OUTPUT_DB  The database file to store the RVA->message mapping
+		   in.  If this file already exists, it will be
+		   overwritten.
 
 
 =BUGS=
