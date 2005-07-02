@@ -21,6 +21,7 @@ GrokEVT
 	to convert the logs to something useful.
 	
 	**Mounting and Configuration**
+
 	This is the most labor-intensive step of the process.  There are
 	several technical reasons why this can't be simpler, and it is
 	unlikely many will be resolved anytime soon. (Sorry, blame the
@@ -102,6 +103,7 @@ GrokEVT
 
 
 	**Using grokevt-builddb(1)**
+
 	Once you get past the mounting and configuration step, you're in
 	good shape.  To extract the necessary information from the
 	system you just mounted, you just need to decide where you want
@@ -123,6 +125,7 @@ GrokEVT
 
 
 	**Using grokevt-parselog(1)**
+
 	To run grokevt-parselog(1), you must specify the database
 	directory that you generated with grokevt-builddb(1):
 

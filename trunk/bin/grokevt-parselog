@@ -310,7 +310,7 @@ def getRecord(f):
             source,
             category,
             event_id,
-            event_rva,
+            "0x%s" % event_rva,
             sid,
             computer,
             message,
