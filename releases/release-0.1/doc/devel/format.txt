@@ -1,0 +1,78 @@
+Windows Event Log Entry Format.
+
+0: 32bits, little endian
+   Length of record, in bytes, including these 4 bytes
+
+1: 32bits, fixed value
+   Message Separator, with value:
+   1001100011001100100110001100101b or 0x4c664c65 or "LfLe"
+
+2: 32bits, little endian
+   Message Number
+
+3: 32bits, little endian
+   Date Created UTC, in seconds since the epoch(unix?).  
+
+4: 32bits, little endian
+   Date Written UTC, in seconds since the epoch(unix?).
+
+5: 32bits, little endian
+   Event ID and Offset
+   High two bytes are the offset into the windoze DLL which holds the
+   messages.  The two low order bytes are what is displayed to the user
+   as the Event ID.  The number taken as a whole is used to grab the
+   message from the DLL using the windoze FormatMessage() call.
+
+6: 16bits, little endian
+   Event Type
+   One of 5 values.
+
+7: 16bits, little endian
+   String Count 
+   The number of strings in the event? Not always accurate?
+
+8: 16bits, little endian
+   Category
+
+9: 16bits
+   UNKNOWN
+
+10: 32bits
+    UNKNOWN
+
+11: 32bits, little endian
+    Strings Offset
+    Pointer to a sequence of NULL terminated unicode strings
+    (NULL == '\x00\x00') used in the message template.  
+    This pointer is relative to the very beginning of the record.
+    The end of the strings section appears to be the beginning of the
+    other data section.
+
+12: 32bits, little endian
+    SID string length
+    Set to 0 if it isn't included.
+
+13: 32bits, little endian
+    SID pointer
+    This pointer is relative to the very beginning of the record.
+
+14: 32bits, little endian
+    Other data length
+    Length of supplimentary data included in log.  
+    0 if none exists.
+
+15: 32bits, little endian
+    Other data pointer
+    This pointer is relative to the very beginning of the record.
+
+16: variable length fields
+    16.1: NULL terminated unicode string (NULL == '\x00\x00')
+          The windoze log source.  This value is used to look up (using
+          the registry) what DLLs need to be searched for the proper
+          EventID message template.  
+
+    16.2: NULL terminated unicode string (NULL == '\x00\x00')
+          Computer Name which generated the log entry.
+
+    16.3: General buffer.  Everything 12.2 is pointed to by the
+          pointers in fields 11, 13, and 15.
