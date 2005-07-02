@@ -9,7 +9,7 @@ PYTHON_VERSION:=`echo 'import sys;\
 PREFIX=/usr/local
 LIB_PREFIX:=$(PREFIX)/lib/python$(PYTHON_VERSION)/site-packages
 BIN_PREFIX=$(PREFIX)/bin
-ETC_PREFIX=$(PREFIX)/etc
+ETC_PREFIX=$(PREFIX)/etc/grokevt
 DOC_PREFIX=$(PREFIX)/share/doc/grokevt
 MAN_PREFIX=$(PREFIX)/man
 
