@@ -3,7 +3,7 @@ Prerequisites
 In order to install this package, you must have the following already
 set up on your system:
  - Python 2.3+
- - Make (tested with GNU Make)
+ - GNU Make
 
 In order to use this software you also need:
  - RegLookup
@@ -26,8 +26,10 @@ For most installations, this is as simple as:
  make
 
 which will create the build/ directory with all install-ready items
-neatly arranged.  If you desire to change the path of the configuration
-files, you will want to instead set the ETC_PREFIX variable:
+neatly arranged.  (If your system does not use GNU Make by default,
+you'll probably have to use `gmake' instead.)  If you wish to change
+the path of the configuration files, you will want to instead set the
+ETC_PREFIX variable:
 
  make ETC_PREFIX=/path/to/etc
 
