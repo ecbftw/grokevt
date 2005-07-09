@@ -1,0 +1,288 @@
+#!/usr/bin/env python
+
+# This script builds message databases for use by grokevt-parselog.
+#
+# Copyright (C) 2005 Timothy D. Morgan
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation version 2 of the
+# License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# $Id$
+
+
+import sys
+import os
+import popen2
+import anydbm
+import grokevt
+
+
+def usage():
+    print "USAGE:"
+    print "  %s <CONFIG_PROFILE> <OUTPUT_DIR>"\
+          % os.path.basename(sys.argv[0])
+    print
+    print "grokevt-builddb builds a database tree based on a single"
+    print "windows system for the purpose of event log conversion."
+    print "Please see the man page for more information."
+
+
+def windowsPathToUnixPath(path_list, variables, drives):
+    ret_val = path_list.lower()
+
+    for s in variables.items():
+        ret_val = ret_val.replace(s[0].lower(), s[1].lower())
+
+    ret_val = ret_val.replace("\\", "/")
+
+    paths = ret_val.split(';')
+    ret_val = []
+    for p in paths:
+        for s in drives.items():
+            if p.startswith(s[0].lower()):
+                p = p.replace(s[0].lower(), s[1], 1)
+        ret_val.append(p)
+
+    return ret_val
+
+
+def buildShortNamesPathsDicts(paths):
+    ret_val1 = {}
+    ret_val2 = {}
+    for p in paths.keys():
+        if os.path.isfile(p):
+            sn = os.path.basename(p).replace(':','_')
+            ext = '.db'
+            i = 2
+            while ret_val1.has_key(sn + ext):
+                ext = '_'+i+'.db'
+                i += 1
+
+            ret_val1[sn+ext] = p
+            ret_val2[p] = sn+ext
+        else:
+            sys.stderr.write("WARNING: %s doesn't exist.\n" % p)
+    
+    return (ret_val1, ret_val2)
+
+
+def makeOutputDirectories(topdir, logs):
+    dirs = []
+    for log in logs:
+        dirs.append('%s/services/%s' % (topdir,log))
+    dirs.append('%s/messages' % topdir)
+    dirs.append('%s/logs' % topdir)
+
+    for p in dirs:
+        if os.path.exists(p):
+            if not os.path.isdir(p) or not os.access(p, os.W_OK):
+                sys.stderr.write("ERROR: Access denied to '%s'.\n" % p)
+                sys.exit(2)
+        else:
+            os.makedirs(p, 0755)
+
+
+def writeServiceMapping(topdir, maps):
+    for lt in maps.keys():
+        for t in maps[lt].keys():
+            db_file = "%s/services/%s/%s.db"%(topdir,lt,t)
+            db = anydbm.open(db_file, "n", 0644)
+            for si in maps[lt][t].items():
+                db[si[0]] = si[1]
+            db.sync()
+            db.close()
+
+
+def writeDBFiles(topdir, names2paths):
+    for npi in names2paths.items():
+        outdb = "%s/messages/%s" % (topdir, npi[0])
+        db_call = (PATH_RIPDLL, npi[1], outdb)
+        child_proc = popen2.Popen3(db_call, 1)
+        
+        child_ret = child_proc.wait()
+        if child_ret > 0:
+            sys.stderr.write(("WARNING: grokevt-ripdll returned code: %d."
+                              +"  Is it in your path?\n") % child_ret)
+        
+        for l in child_proc.fromchild.readlines():
+            sys.stderr.write(("WARNING: while reading %s and writing %s,"
+                              +" grokevt-ripdll returned: %s\n")\
+                             % (npi[1], outdb, l.strip()))
+        for l in child_proc.childerr.readlines():
+            sys.stderr.write(("WARNING: while reading %s and writing %s,"
+                              +" grokevt-ripdll returned: %s\n")\
+                             % (npi[1], outdb, l.strip()))
+
+
+# XXX: is this right?  Is there a better way to find the right ControlSet?
+REGPATH_EVENTLOG='$$$PROTO.HIV/ControlSet001/Services/Eventlog'
+# XXX: should these be changed to absolute paths?
+PATH_REGLOOKUP='reglookup'
+PATH_RIPDLL='grokevt-ripdll'
+
+
+if len(sys.argv) != 3:
+    usage()
+    sys.exit(1)
+
+CONFIG_PROFILE = sys.argv[1]
+PATH_OUTPUT = sys.argv[2]
+
+print "Loading configuration..."
+config = grokevt.grokevtConfig(grokevt.PATH_CONFIG, CONFIG_PROFILE)
+
+print "Reading registry for service information..."
+logs_query=(PATH_REGLOOKUP,"-tKEY","-f%s" % REGPATH_EVENTLOG,
+            config.registry_path)
+child_proc = popen2.Popen3(logs_query, 1)
+
+# First, identify all log types by grabbing all keys under the eventlog key
+log_types = {}
+prefix_len = len(REGPATH_EVENTLOG)
+
+child_ret = child_proc.wait()
+if child_ret > 0:
+    sys.stderr.write(("WARNING: reglookup returned code: %d."
+                      +"  Is reglookup in your path?\n") % child_ret)
+
+l = child_proc.fromchild.readline()
+while l != '':
+    l = l[prefix_len:].lstrip('/').split('/')[0].split(':')[0].strip()
+    if l:
+        #XXX: decode log_type (l), one at a time
+        #XXX: do log names need to be case-squashed?
+        log_types[l] = None
+    l = child_proc.fromchild.readline()
+
+for l in child_proc.childerr.readlines():
+    sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
+
+# Now, for each log type, grab list of all services in the Sources MULTI_SZ
+files = {}
+evt_files = {}
+for lt in log_types.keys():
+    evt_query = (PATH_REGLOOKUP,
+                 "-tEXPAND_SZ",
+                 "-f%s/%s/File" % (REGPATH_EVENTLOG,lt),
+                 config.registry_path)
+    child_proc = popen2.Popen3(evt_query, 1)
+
+    child_ret = child_proc.wait()
+    if child_ret > 0:
+        sys.stderr.write("WARNING: reglookup returned code: %d.\n" % child_ret)
+
+    l = child_proc.fromchild.readline().split('=')[1].strip()
+    evt_files[lt] = windowsPathToUnixPath(l, config.path_vars,
+                                          config.drive_mapping)[0]
+    for l in child_proc.childerr.readlines():
+        sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
+    
+    logs_query = (PATH_REGLOOKUP,
+                  "-tMULTI_SZ",
+                  "-f%s/%s/Sources" % (REGPATH_EVENTLOG,lt),
+                  config.registry_path)
+    child_proc = popen2.Popen3(logs_query, 1)
+
+    child_ret = child_proc.wait()
+    if child_ret > 0:
+        sys.stderr.write("WARNING: reglookup returned code: %d.\n" % child_ret)
+
+    log_types[lt] = {}
+    log_types[lt]["event"] = {}
+    log_types[lt]["category"] = {}
+    log_types[lt]["parameter"] = {}
+    
+    
+    # For each service under this log type, grab the associated event,
+    # category, and parameter message file lists.
+    l = child_proc.fromchild.readline()
+    services = l.split('=')[1].split('|')
+    for l in child_proc.childerr.readlines():
+        sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
+    for s in services:
+        s = s.strip()
+        #XXX: decode service names (s), one at a time
+        service_path = "%s/%s/%s/" % (REGPATH_EVENTLOG,lt,s)
+        service_path_len = len(service_path)
+        dlls_query = (PATH_REGLOOKUP,
+                      "-tEXPAND_SZ",
+                      "-f%s" % service_path,
+                      config.registry_path)
+
+        s = s.lower()
+        child_proc = popen2.Popen3(dlls_query, 1)
+
+        child_ret = child_proc.wait()
+        if child_ret > 0:
+            sys.stderr.write("WARNING: reglookup returned code: %d.\n"
+                             % child_ret)
+
+        child_proc.wait()
+        for l in child_proc.childerr.readlines():
+            sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
+        lines = child_proc.fromchild.readlines()
+        for l in lines:
+            # This is just to speed up the find() calls
+            l = l[service_path_len:]
+
+            t = None
+            if l.find("EventMessageFile") >= 0:
+                t = "event"
+            elif l.find("CategoryMessageFile") >= 0:
+                t = "category"
+            elif l.find("ParameterMessageFile") >= 0:
+                t = "parameter"
+            if t:
+                #XXX: unquote result before assignment
+                log_types[lt][t][s]\
+                  = windowsPathToUnixPath(l.split('=')[1].strip(),
+                                          config.path_vars,
+                                          config.drive_mapping)
+                # Retain unique list of file names
+                for f in log_types[lt][t][s]:
+                    files[f] = None
+
+(names2paths,paths2names) = buildShortNamesPathsDicts(files)
+
+# Convert path lists to named path strings.  Filter out any unusable resources
+# and any services that have no remaining resources.
+for lt in log_types.keys():
+    for t in log_types[lt].keys():
+        for s in log_types[lt][t].keys():
+            tmp_str = ''
+            for i in range(0,len(log_types[lt][t][s])):
+                if paths2names.has_key(log_types[lt][t][s][i]):
+                    tmp_str += ':' + paths2names[log_types[lt][t][s][i]]
+            log_types[lt][t][s] = tmp_str.lstrip(':')
+            #print "%s\t=\t%s" % (s, log_types[lt][t][s])
+            if log_types[lt][t][s] == '':
+                sys.stderr.write("WARNING: service %s removed" % s\
+                                 +" due to missing message sources.\n")
+                del log_types[lt][t][s]
+
+print "Writing service mappings..."
+makeOutputDirectories(PATH_OUTPUT, log_types.keys())
+writeServiceMapping(PATH_OUTPUT, log_types)
+
+print "Writing DLL databases..."
+writeDBFiles(PATH_OUTPUT, names2paths)
+
+print "Copying log files..."
+for ei in evt_files.items():
+    o = file("%s/logs/%s.evt" % (PATH_OUTPUT,ei[0]), "w+")
+    i = file(ei[1], "r")
+    buf = i.read(1024)
+    while buf != "":
+        o.write(buf)
+        buf = i.read(1024)
+    o.close()
+    i.close()
+
+print "Done."
