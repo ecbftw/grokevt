@@ -122,7 +122,7 @@ def writeDBFiles(topdir, names2paths):
 
 
 # XXX: is this right?  Is there a better way to find the right ControlSet?
-REGPATH_EVENTLOG='$$$PROTO.HIV/ControlSet001/Services/Eventlog'
+REGPATH_EVENTLOG='/ControlSet001/Services/Eventlog'
 # XXX: should these be changed to absolute paths?
 PATH_REGLOOKUP='reglookup'
 PATH_RIPDLL='grokevt-ripdll'
@@ -139,7 +139,7 @@ print "Loading configuration..."
 config = grokevt.grokevtConfig(grokevt.PATH_CONFIG, CONFIG_PROFILE)
 
 print "Reading registry for service information..."
-logs_query=(PATH_REGLOOKUP,"-tKEY","-f%s" % REGPATH_EVENTLOG,
+logs_query=(PATH_REGLOOKUP,"-t", "KEY", "-f", REGPATH_EVENTLOG,
             config.registry_path)
 child_proc = popen2.Popen3(logs_query, 1)
 
@@ -169,8 +169,8 @@ files = {}
 evt_files = {}
 for lt in log_types.keys():
     evt_query = (PATH_REGLOOKUP,
-                 "-tEXPAND_SZ",
-                 "-f%s/%s/File" % (REGPATH_EVENTLOG,lt),
+                 "-t", "EXPAND_SZ",
+                 "-f", "%s/%s/File" % (REGPATH_EVENTLOG,lt),
                  config.registry_path)
     child_proc = popen2.Popen3(evt_query, 1)
 
@@ -185,8 +185,8 @@ for lt in log_types.keys():
         sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
     
     logs_query = (PATH_REGLOOKUP,
-                  "-tMULTI_SZ",
-                  "-f%s/%s/Sources" % (REGPATH_EVENTLOG,lt),
+                  "-t", "MULTI_SZ",
+                  "-f", "%s/%s/Sources" % (REGPATH_EVENTLOG,lt),
                   config.registry_path)
     child_proc = popen2.Popen3(logs_query, 1)
 
@@ -212,8 +212,8 @@ for lt in log_types.keys():
         service_path = "%s/%s/%s/" % (REGPATH_EVENTLOG,lt,s)
         service_path_len = len(service_path)
         dlls_query = (PATH_REGLOOKUP,
-                      "-tEXPAND_SZ",
-                      "-f%s" % service_path,
+                      "-t", "EXPAND_SZ",
+                      "-f", service_path,
                       config.registry_path)
 
         s = s.lower()
