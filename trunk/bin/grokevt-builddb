@@ -19,6 +19,7 @@
 
 import sys
 import os
+import re
 import popen2
 import anydbm
 import grokevt
@@ -32,6 +33,15 @@ def usage():
     print "grokevt-builddb builds a database tree based on a single"
     print "windows system for the purpose of event log conversion."
     print "Please see the man page for more information."
+
+
+def unquoteString(s):
+    chunks = re.split("\\\\x([0-9A-F]{2})", s);
+
+    for i in range(1,len(chunks),2):
+        chunks[i] = "%c" % int(chunks[i], 16)
+
+    return ''.join(chunks)
 
 
 def windowsPathToUnixPath(path_list, variables, drives):
@@ -156,9 +166,8 @@ l = child_proc.fromchild.readline()
 while l != '':
     l = l.split(',')[0][prefix_len:].lstrip('/').split('/')[0].strip()
     if l:
-        #XXX: decode log_type (l), one at a time
         #XXX: do log names need to be case-squashed?
-        log_types[l] = None
+        log_types[unquoteString(l)] = None
     l = child_proc.fromchild.readline()
 
 for l in child_proc.childerr.readlines():
@@ -180,7 +189,8 @@ for lt in log_types.keys():
         sys.stderr.write("WARNING: reglookup returned code: %d.\n" % child_ret)
 
     l = child_proc.fromchild.readline().split(',')[2].strip()
-    evt_files[lt] = windowsPathToUnixPath(l, config.path_vars,
+    evt_files[lt] = windowsPathToUnixPath(unquoteString(l),
+                                          config.path_vars,
                                           config.drive_mapping)[0]
     for l in child_proc.childerr.readlines():
         sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
@@ -209,8 +219,7 @@ for lt in log_types.keys():
         sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
     for s in services:
         s = s.strip()
-        #XXX: decode service names (s), one at a time
-        service_path = "%s/%s/%s/" % (REGPATH_EVENTLOG,lt,s)
+        service_path = "%s/%s/%s/" % (REGPATH_EVENTLOG,lt,unquoteString(s))
         service_path_len = len(service_path)
         dlls_query = (PATH_REGLOOKUP, "-H",
                       "-t", "EXPAND_SZ",
@@ -241,9 +250,8 @@ for lt in log_types.keys():
             elif l.find("ParameterMessageFile") >= 0:
                 t = "parameter"
             if t:
-                #XXX: unquote result before assignment
                 log_types[lt][t][s]\
-                  = windowsPathToUnixPath(l.split(',')[2].strip(),
+                  = windowsPathToUnixPath(unquoteString(l.split(',')[2].strip()),
                                           config.path_vars,
                                           config.drive_mapping)
                 # Retain unique list of file names
