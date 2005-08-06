@@ -139,7 +139,7 @@ print "Loading configuration..."
 config = grokevt.grokevtConfig(grokevt.PATH_CONFIG, CONFIG_PROFILE)
 
 print "Reading registry for service information..."
-logs_query=(PATH_REGLOOKUP, "-t", "KEY", "-p", REGPATH_EVENTLOG,
+logs_query=(PATH_REGLOOKUP, "-H", "-t", "KEY", "-p", REGPATH_EVENTLOG,
             config.registry_path)
 child_proc = popen2.Popen3(logs_query, 1)
 
@@ -169,7 +169,7 @@ for l in child_proc.childerr.readlines():
 files = {}
 evt_files = {}
 for lt in log_types.keys():
-    evt_query = (PATH_REGLOOKUP,
+    evt_query = (PATH_REGLOOKUP, "-H",
                  "-t", "EXPAND_SZ",
                  "-p", "%s/%s/File" % (REGPATH_EVENTLOG,lt),
                  config.registry_path)
@@ -185,7 +185,7 @@ for lt in log_types.keys():
     for l in child_proc.childerr.readlines():
         sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
     
-    logs_query = (PATH_REGLOOKUP,
+    logs_query = (PATH_REGLOOKUP, "-H",
                   "-t", "MULTI_SZ",
                   "-p", "%s/%s/Sources" % (REGPATH_EVENTLOG,lt),
                   config.registry_path)
@@ -212,7 +212,7 @@ for lt in log_types.keys():
         #XXX: decode service names (s), one at a time
         service_path = "%s/%s/%s/" % (REGPATH_EVENTLOG,lt,s)
         service_path_len = len(service_path)
-        dlls_query = (PATH_REGLOOKUP,
+        dlls_query = (PATH_REGLOOKUP, "-H",
                       "-t", "EXPAND_SZ",
                       "-p", service_path,
                       config.registry_path)
