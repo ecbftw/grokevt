@@ -139,7 +139,7 @@ print "Loading configuration..."
 config = grokevt.grokevtConfig(grokevt.PATH_CONFIG, CONFIG_PROFILE)
 
 print "Reading registry for service information..."
-logs_query=(PATH_REGLOOKUP,"-t", "KEY", "-f", REGPATH_EVENTLOG,
+logs_query=(PATH_REGLOOKUP, "-t", "KEY", "-p", REGPATH_EVENTLOG,
             config.registry_path)
 child_proc = popen2.Popen3(logs_query, 1)
 
@@ -154,7 +154,7 @@ if child_ret > 0:
 
 l = child_proc.fromchild.readline()
 while l != '':
-    l = l[prefix_len:].lstrip('/').split('/')[0].split(':')[0].strip()
+    l = l.split(',')[0][prefix_len:].lstrip('/').split('/')[0].strip()
     if l:
         #XXX: decode log_type (l), one at a time
         #XXX: do log names need to be case-squashed?
@@ -164,13 +164,14 @@ while l != '':
 for l in child_proc.childerr.readlines():
     sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
 
-# Now, for each log type, grab list of all services in the Sources MULTI_SZ
+# Now, for each log type, grab the log file path and the list of all
+# services in the Sources MULTI_SZ
 files = {}
 evt_files = {}
 for lt in log_types.keys():
     evt_query = (PATH_REGLOOKUP,
                  "-t", "EXPAND_SZ",
-                 "-f", "%s/%s/File" % (REGPATH_EVENTLOG,lt),
+                 "-p", "%s/%s/File" % (REGPATH_EVENTLOG,lt),
                  config.registry_path)
     child_proc = popen2.Popen3(evt_query, 1)
 
@@ -178,7 +179,7 @@ for lt in log_types.keys():
     if child_ret > 0:
         sys.stderr.write("WARNING: reglookup returned code: %d.\n" % child_ret)
 
-    l = child_proc.fromchild.readline().split('=')[1].strip()
+    l = child_proc.fromchild.readline().split(',')[2].strip()
     evt_files[lt] = windowsPathToUnixPath(l, config.path_vars,
                                           config.drive_mapping)[0]
     for l in child_proc.childerr.readlines():
@@ -186,7 +187,7 @@ for lt in log_types.keys():
     
     logs_query = (PATH_REGLOOKUP,
                   "-t", "MULTI_SZ",
-                  "-f", "%s/%s/Sources" % (REGPATH_EVENTLOG,lt),
+                  "-p", "%s/%s/Sources" % (REGPATH_EVENTLOG,lt),
                   config.registry_path)
     child_proc = popen2.Popen3(logs_query, 1)
 
@@ -203,7 +204,7 @@ for lt in log_types.keys():
     # For each service under this log type, grab the associated event,
     # category, and parameter message file lists.
     l = child_proc.fromchild.readline()
-    services = l.split('=')[1].split('|')
+    services = l.split(',')[2].split('|')
     for l in child_proc.childerr.readlines():
         sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
     for s in services:
@@ -213,7 +214,7 @@ for lt in log_types.keys():
         service_path_len = len(service_path)
         dlls_query = (PATH_REGLOOKUP,
                       "-t", "EXPAND_SZ",
-                      "-f", service_path,
+                      "-p", service_path,
                       config.registry_path)
 
         s = s.lower()
@@ -242,7 +243,7 @@ for lt in log_types.keys():
             if t:
                 #XXX: unquote result before assignment
                 log_types[lt][t][s]\
-                  = windowsPathToUnixPath(l.split('=')[1].strip(),
+                  = windowsPathToUnixPath(l.split(',')[2].strip(),
                                           config.path_vars,
                                           config.drive_mapping)
                 # Retain unique list of file names
