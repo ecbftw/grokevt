@@ -1,0 +1,81 @@
+grokevt-parselog
+
+
+=NAME=
+	grokevt-parselog - Parse a windows event log and generate
+	human-readable output based on message resources stored in a
+	database. 
+
+
+=SYNOPSIS=
+	grokevt-parselog <DATABASE_DIR> [<LOG_TYPE>]
+
+
+=DESCRIPTION=
+	grokevt-parselog reads a windows event log (.evt file) and
+	combines that information with messages templates and other
+	resources stored in a pre-generated database.  This is then
+	printed to stdout in a comma-seperated values (CSV) format.  
+	The database must be created by grokevt-builddb(1).
+
+
+=ARGUMENTS=
+	DATABASE_DIR	This is the directory where the database is
+			stored.  Currently, the actual log files from
+			the original system are also stored in this
+			directory tree.
+
+	LOG_TYPE	This is the windows name for the log.  By
+			default windows has the following logs:
+
+			  Application
+			  Security
+			  System
+
+			But others may have been created by third party
+			software.  If this option is omitted,
+			grokevt-parselog will print a list of all
+			available log types in the specified database.
+			(The log names are case-sensitive.)
+
+
+=EXAMPLES=
+	To list all available logs types stored in '~/example.grokevt':
+	  **grokevt-parselog ~/example.grokevt**
+
+	To read the 'Application' log from the database stored in
+	'~/example.grokevt' and print it to stdout:
+	  **grokevt-parselog ~/example.grokevt Application**
+
+
+=BUGS=
+	Probably many.  This software should be considered unstable.
+	
+	The file event log file format isn't 100% understood at this
+	time. 
+
+	Unicode support is currently non-existent.
+
+
+=SEE ALSO=
+	grokevt-builddb(1) grokevt-ripdll(1) grokevt(7)
+
+
+=CREDITS=
+	Originally written by Jamie French.
+
+	Converted to Python and extended by Timothy D. Morgan.
+
+	Copyright (C) 2005 Timothy D. Morgan
+
+	Copyright (C) 2004 Jamie French
+
+
+=LICENSE=
+	Please see the file "LICENSE" included with this software
+	distribution.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License version 2 for more details.
