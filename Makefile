@@ -4,7 +4,7 @@
 ################################################################################
 
 SVN_URL=svn+ssh://sentinelchicken.org/home/projects/subversion/grokevt
-SUB_DIRS=$(wildcard releases/release-*) trunk
+SUB_DIRS=$(wildcard releases/*) trunk
 
 .PHONY: all $(SUB_DIRS) clean
 export
