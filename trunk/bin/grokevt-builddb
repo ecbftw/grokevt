@@ -72,7 +72,7 @@ def buildShortNamesPathsDicts(paths):
             ext = '.db'
             i = 2
             while ret_val1.has_key(sn + ext):
-                ext = '_'+i+'.db'
+                ext = '_%d.db' % i
                 i += 1
 
             ret_val1[sn+ext] = p
@@ -284,14 +284,19 @@ print "Writing DLL databases..."
 writeDBFiles(PATH_OUTPUT, names2paths)
 
 print "Copying log files..."
-for ei in evt_files.items():
-    o = file("%s/logs/%s.evt" % (PATH_OUTPUT,ei[0]), "w+")
-    i = file(ei[1], "r")
-    buf = i.read(1024)
-    while buf != "":
-        o.write(buf)
+try:
+    for ei in evt_files.items():
+        o = file("%s/logs/%s.evt" % (PATH_OUTPUT,ei[0]), "w+")
+        i = file(ei[1], "r")
         buf = i.read(1024)
-    o.close()
-    i.close()
+        while buf != "":
+            o.write(buf)
+            buf = i.read(1024)
+        o.close()
+        i.close()
+except Exception, inst:
+    print "ERROR: could not copy all log files."
+    print type(inst)
+    print inst
 
 print "Done."
