@@ -330,19 +330,36 @@ if ((len(sys.argv) != 3) and (len(sys.argv) != 2))\
     usage()
     sys.exit(1)
 
-DB_PATH=sys.argv[1]
-if len(sys.argv) == 2:
-    logs = os.listdir("%s/services" % DB_PATH)
-    for l in logs:
-        print l
-    sys.exit(0)
+try:
+    DB_PATH=sys.argv[1]
+    if len(sys.argv) == 2:
+        logs = os.listdir("%s/services" % DB_PATH)
+        for l in logs:
+            print l
+        sys.exit(0)
+except Exception, inst:
+    print inst
+    print "ERROR: Could not list services directory."
+    print "       Did you run grokevt-builddb first?"
+    sys.exit(2)
 
-
-LOG=sys.argv[2]
-msg_repo = messageRepository(DB_PATH, LOG)
+try:
+    LOG=sys.argv[2]
+    msg_repo = messageRepository(DB_PATH, LOG)
+except Exception, inst:
+    print inst
+    print "ERROR: Could not read message repository."
+    print "       Did you run grokevt-builddb first?"
+    sys.exit(2)
 
 evt_file = "%s/logs/%s.evt" % (DB_PATH, LOG)
-evt_handle = file(evt_file, "r")
+try:
+    evt_handle = file(evt_file, "r")
+except Exception, inst:
+    print inst
+    print "ERROR: Could not open log file."
+    print "       Did grokevt-builddb finish without errors?"
+    sys.exit(2)
 
 csvwriter = csv.writer(sys.stdout)
 csvwriter.writerow(header_rec)

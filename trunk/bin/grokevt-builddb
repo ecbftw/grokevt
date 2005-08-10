@@ -295,8 +295,8 @@ try:
         o.close()
         i.close()
 except Exception, inst:
-    print "ERROR: could not copy all log files."
-    print type(inst)
     print inst
+    print "ERROR: could not copy all log files."
+    sys.exit(2)
 
 print "Done."
