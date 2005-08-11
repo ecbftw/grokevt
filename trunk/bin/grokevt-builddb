@@ -215,48 +215,55 @@ for lt in log_types.keys():
     # category, and parameter message file lists.
     l = child_proc.fromchild.readline()
     services = l.split(',')[2].split('|')
+    for s in services:
+        s = s.strip().lower()
+        log_types[lt]["event"][s] = None
+        log_types[lt]["category"][s] = None
+        log_types[lt]["parameter"][s] = None
+        
     for l in child_proc.childerr.readlines():
         sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
-    for s in services:
-        s = s.strip()
-        service_path = "%s/%s/%s/" % (REGPATH_EVENTLOG,lt,unquoteString(s))
-        service_path_len = len(service_path)
-        dlls_query = (PATH_REGLOOKUP, "-H",
-                      "-t", "EXPAND_SZ",
-                      "-p", service_path,
-                      config.registry_path)
 
-        s = s.lower()
-        child_proc = popen2.Popen3(dlls_query, 1)
 
-        child_ret = child_proc.wait()
-        if child_ret > 0:
-            sys.stderr.write("WARNING: reglookup returned code: %d.\n"
-                             % child_ret)
+    # Now grab whole tree under this log type and parse it
+    lt_path = "%s/%s" % (REGPATH_EVENTLOG,lt)
+    lt_path_len = len(lt_path)
+    dlls_query = (PATH_REGLOOKUP, "-H",
+                  "-p", lt_path,
+                  config.registry_path)
+    child_proc = popen2.Popen3(dlls_query, 1)
+    child_ret = child_proc.wait()
+    if child_ret > 0:
+        sys.stderr.write("WARNING: reglookup returned code: %d.\n"
+                         % child_ret)
+    child_proc.wait()
+    for l in child_proc.childerr.readlines():
+        sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
 
-        child_proc.wait()
-        for l in child_proc.childerr.readlines():
-            sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
-        lines = child_proc.fromchild.readlines()
-        for l in lines:
-            # This is just to speed up the find() calls
-            l = l[service_path_len:]
+    l = child_proc.fromchild.readline()
+    while l != '':
+        fields = l.split(',')
+        # trim unneeded prefix from path
+        fields[0] = fields[0][lt_path_len:].lstrip('/')
 
+        s = fields[0].split('/')[0].lower()
+        if(fields[1] == 'EXPAND_SZ' and log_types[lt]['event'].has_key(s)):
             t = None
-            if l.find("EventMessageFile") >= 0:
+            if fields[0].find("EventMessageFile") >= 0:
                 t = "event"
-            elif l.find("CategoryMessageFile") >= 0:
+            elif fields[0].find("CategoryMessageFile") >= 0:
                 t = "category"
-            elif l.find("ParameterMessageFile") >= 0:
+            elif fields[0].find("ParameterMessageFile") >= 0:
                 t = "parameter"
             if t:
                 log_types[lt][t][s]\
-                  = windowsPathToUnixPath(unquoteString(l.split(',')[2].strip()),
+                  = windowsPathToUnixPath(unquoteString(fields[2].strip()),
                                           config.path_vars,
                                           config.drive_mapping)
                 # Retain unique list of file names
                 for f in log_types[lt][t][s]:
                     files[f] = None
+        l = child_proc.fromchild.readline()
 
 (names2paths,paths2names) = buildShortNamesPathsDicts(files)
 
@@ -265,15 +272,18 @@ for lt in log_types.keys():
 for lt in log_types.keys():
     for t in log_types[lt].keys():
         for s in log_types[lt][t].keys():
-            tmp_str = ''
-            for i in range(0,len(log_types[lt][t][s])):
-                if paths2names.has_key(log_types[lt][t][s][i]):
-                    tmp_str += ':' + paths2names[log_types[lt][t][s][i]]
-            log_types[lt][t][s] = tmp_str.lstrip(':')
-            #print "%s\t=\t%s" % (s, log_types[lt][t][s])
-            if log_types[lt][t][s] == '':
-                sys.stderr.write("WARNING: service %s removed" % s\
-                                 +" due to missing message sources.\n")
+            if(log_types[lt][t][s]):
+                tmp_str = ''
+                for i in range(0,len(log_types[lt][t][s])):
+                    if paths2names.has_key(log_types[lt][t][s][i]):
+                        tmp_str += ':' + paths2names[log_types[lt][t][s][i]]
+                log_types[lt][t][s] = tmp_str.lstrip(':')
+
+                if log_types[lt][t][s] == '':
+                    del log_types[lt][t][s]
+                    sys.stderr.write("WARNING: service '%s' removed" % s\
+                                     +" due to missing message sources.\n")
+            else:
                 del log_types[lt][t][s]
 
 print "Writing service mappings..."
