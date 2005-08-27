@@ -87,9 +87,9 @@ def guessRecordType(f):
 
 def getHeaderRecord(f):
     fmt = '<IIIIIIIIIIII'
-    fmt_len = struct.calcsize(fixed_fmt)
+    fmt_len = struct.calcsize(fmt)
     #XXX: check for read failure
-    raw_rec = f.read(fixed_fmt)
+    raw_rec = f.read(fmt_len)
     
     (size1,lfle,unknown1,unknown2,
      first_off,next_off,next_num,first_num,
@@ -110,9 +110,9 @@ def getHeaderRecord(f):
 
 def getCursorRecord(f):
     fmt = '<IIIIIIIIII'
-    fmt_len = struct.calcsize(fixed_fmt)
+    fmt_len = struct.calcsize(fmt)
     #XXX: check for read failure
-    raw_rec = f.read(fixed_fmt)
+    raw_rec = f.read(fmt_len)
     
     (size1,magic1,magic2,magic3,magic4,
      first_off,next_off,next_num,first_num,
@@ -256,10 +256,36 @@ except Exception, inst:
     print "       Did grokevt-builddb finish without errors?"
     sys.exit(2)
 
+
+if(guessRecordType(evt_handle) != 'header'):
+    print "ERROR: file doesn't contain event log header."
+    print "       Are you sure this is an event log?"
+    sys.exit(3)
+
+
+# Begin parsing logic
+header = getHeaderRecord(evt_handle)
 csvwriter = csv.writer(sys.stdout)
 csvwriter.writerow(header_rec)
-rec = getLogRecord(evt_handle)
-while rec:
-    rec = map(quoteBinaryInString, rec)
-    csvwriter.writerow(rec)
+
+evt_handle.seek(header['next_off'])
+if(guessRecordType(evt_handle) != 'cursor'):
+    sys.stderr.write("WARNING: could not locate cursor record.\n")
+    sys.stderr.write("         Naive parsing enabled.\n")
+
+    evt_handle.seek(0x30)
     rec = getLogRecord(evt_handle)
+    while rec:
+        rec = map(quoteBinaryInString, rec)
+        csvwriter.writerow(rec)
+        rec = getLogRecord(evt_handle)
+    
+else:
+    cursor = getCursorRecord(evt_handle)
+    evt_handle.seek(cursor['first_off'])
+    
+    rec = getLogRecord(evt_handle)
+    while rec and (evt_handle.tell() <= cursor['next_off']):
+        rec = map(quoteBinaryInString, rec)
+        csvwriter.writerow(rec)
+        rec = getLogRecord(evt_handle)
