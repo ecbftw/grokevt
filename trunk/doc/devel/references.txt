@@ -1,3 +1,22 @@
+Event Log Format
+================
+
+The best reference found to date on the format:
+Schuster, A. (2005). Windows Eventlogs in der forensischen Analyse. In
+M. Thorbr?gge (Ed.), Proceedings of the 12th DFN-CERT Workshop
+"Sicherheit in vernetzten Systemen", Hamburg, March 2005 (pp. D1-D16).
+ISBN: 3-00-015369-1
+And the associated presentation slides: 
+  http://www.dfn-cert.de/events/ws/2005/dfncert-ws2005-f4.pdf
+
+The info by Jamie French (aka Malik) which inspired the creation of
+GrokEVT:
+http://www.whitehats.ca/main/members/Malik/malik_eventlogs/malik_eventlogs.html
+
+
+Other References
+================
+
 Micro$oft's PE executable format:
 http://www.csn.ul.ie/~caolan/publink/winresdump/winresdump/doc/pefile.html
 http://www.wotsit.org/download.asp?f=pe
