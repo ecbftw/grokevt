@@ -284,7 +284,7 @@ class evtFile:
       if len(rec_str) < fixed_fmt_len:
          return {'msg_num':-1,'event_type':'',
                  'date_created':'','date_written':'',
-                 'source':s.path.basename(sys.argv[0]), 'category':'',
+                 'source':os.path.basename(sys.argv[0]), 'category':'',
                  'event_id':'-1', 'event_rva':'',
                  'user':'', 'computer':'',
                  'message':"There was an error processing this event."\
