@@ -36,15 +36,6 @@ import csv
 from grokevt import *
 
 
-# XXX: This mapping may not be entirely accurate.  In particular,
-#      FailureAudit and SuccessAudit were educated guesses.  The others
-#      appear to be correct.
-eventTypeEnum = ('FailureAudit',
-                 'Error',
-                 'Warning',
-                 'SuccessAudit',
-                 'Information')
-
 def usage():
     print "USAGE:"
     print "  %s <DATABASE_DIR> [<LOG_TYPE>]"\
@@ -55,168 +46,20 @@ def usage():
     print "more information."
 
 
-def guessRecordType(f):
-    cur_pos = f.tell()
-    ret_val = 'unknown'
 
-    (size1,) = struct.unpack('<I', f.read(4))
-    if(size1 >= 28):
-        f.seek(size1-8,1)
-        (size2,) = struct.unpack('<I', f.read(4))
-        if(size2 == size1):
-            f.seek(4-size1,1)
-            if(size1 == 0x30):
-                magic = f.read(4)
-                if(magic == "\x4c\x66\x4c\x65"):
-                    ret_val = 'header'
-                
-            elif(size1 == 0x28):
-                magic = f.read(16)
-                if(magic == ("\x11\x11\x11\x11\x22\x22\x22\x22"
-                             +"\x33\x33\x33\x33\x44\x44\x44\x44")):
-                    ret_val = 'cursor'
-                
-            else:
-                magic = f.read(4)
-                if(magic == "\x4c\x66\x4c\x65"):
-                    ret_val = 'log'
-    
-    f.seek(cur_pos)
-    return ret_val
+log_fields =("msg_num","event_type",
+             "date_created","date_written",
+             "source","category",
+             "event_id","event_rva",
+             "user","computer",
+             "message","strings","data")
 
-
-def getHeaderRecord(f):
-    fmt = '<IIIIIIIIIIII'
-    fmt_len = struct.calcsize(fmt)
-    #XXX: check for read failure
-    raw_rec = f.read(fmt_len)
-    
-    (size1,lfle,unknown1,unknown2,
-     first_off,next_off,next_num,first_num,
-     file_size,flags,retention,size2) = struct.unpack(fmt, raw_rec)
-
-    flag_dirty =   flags & 0x1
-    flag_wrapped = flags & 0x2
-    flag_logfull = flags & 0x4
-    flag_primary = flags & 0x8
-
-    ret_val = {'first_off':first_off, 'first_num':first_num,
-               'next_off':next_off, 'next_num':next_num,
-               'file_size':file_size, 'retention':retention,
-               'flag_dirty':flag_dirty, 'flag_wrapped':flag_wrapped,
-               'flag_logfull':flag_logfull, 'flag_primary':flag_primary}
-    return ret_val
-
-
-def getCursorRecord(f):
-    fmt = '<IIIIIIIIII'
-    fmt_len = struct.calcsize(fmt)
-    #XXX: check for read failure
-    raw_rec = f.read(fmt_len)
-    
-    (size1,magic1,magic2,magic3,magic4,
-     first_off,next_off,next_num,first_num,
-     size2) = struct.unpack(fmt, raw_rec)
-
-    ret_val = {'first_off':first_off, 'first_num':first_num,
-               'next_off':next_off, 'next_num':next_num}
-    return ret_val
-
-
-def getLogRecord(f):
-    #XXX: check for read failure
-    size_str = f.read(4)
-    if len(size_str) < 4:
-        return None
-    (size,) = struct.unpack('<I', size_str)
-    
-    fixed_fmt = '<IIIIHHHHHHIIIIII'
-    fixed_fmt_len = struct.calcsize(fixed_fmt)
-
-    #XXX: check for read failure
-    rec_str = f.read(size-4)
-    if len(rec_str) < fixed_fmt_len:
-        return [-1,'','','',
-                os.path.basename(sys.argv[0]),
-                '','-1','','','',
-                "There was an error processing this event."\
-                + "Binary record is not long enough.",
-                '','']
-    
-    variable_str_len = len(rec_str) - fixed_fmt_len
-    (lfle,msg_num,
-     date_created,date_written,
-     event_id,event_rva_offset,
-     event_type,strcount,
-     category,unknown,
-     closing_record_number,string_offset,
-     sid_len,sid_offset,
-     data_len,data_offset,
-     variable_str) = struct.unpack("%s%ds" % (fixed_fmt, variable_str_len),
-                                   rec_str)
-    # Grab source and computer fields
-    # XXX: Need to properly handle unicode.
-    source_end = variable_str.find('\x00\x00')
-    source = variable_str[:source_end].replace('\x00', '')
-    tmp = variable_str[source_end+2:]
-    computer_end = tmp.find('\x00\x00')
-    computer = tmp[:computer_end].replace('\x00', '')
-    tmp = None
-    
-    # Grab SID
-    sid = 'N/A'
-    if sid_len > 0:
-        sid_str = rec_str[sid_offset-4:sid_offset+sid_len-4]
-        sid = binSIDtoASCII(sid_str)
-
-    # Grab template variables
-    strs = []
-    if string_offset > 0:
-        strs = rec_str[string_offset-4:data_offset-4].split('\x00\x00')
-        # XXX: Need to properly handle unicode.
-        tmp_strs = []
-        for s in strs:
-            tmp_strs.append(s.replace('\x00', ''))
-        strs = tmp_strs
-        tmp_strs = None
-
-    # Grab binary data chunk
-    data = ''
-    if data_len > 0:
-        data = rec_str[data_offset-4:data_offset+data_len-4]
-    
-    # Retrieve and process message template
-    event_rva = "%.8X"%(long(event_rva_offset)<<16|event_id)
-    message_template = msg_repo.getMessageTemplate(source, event_rva)
-    message = ''
-    if message_template:
-        message = formatMessage(message_template, strs)
-    else:
-        sys.stderr.write("WARNING: Couldn't find message"\
-                         +" template for event record #%d\n" % msg_num)
-
-    # Format fields and return
-    return [msg_num,
-            eventTypeEnum[event_type],
-            time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(date_created)),
-            time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(date_written)),
-            source,
-            category,
-            event_id,
-            "0x%s" % event_rva,
-            sid,
-            computer,
-            message,
-            '|'.join(strs).strip('|'),
-            data]
-
-
-header_rec = ("MSG_NUM","EVENT_TYPE",
-              "DATE_CREATED","DATE_WRITTEN",
-              "SOURCE","CATEGORY",
-              "EVENT_ID","EVENT_RVA",
-              "USER","COMPUTER",
-              "MESSAGE","STRINGS","DATA")
+header_rec = {'msg_num':"MSG_NUM",'event_type':"EVENT_TYPE",
+              'date_created':"DATE_CREATED",'date_written':"DATE_WRITTEN",
+              'source':"SOURCE",'category':"CATEGORY",
+              'event_id':"EVENT_ID",'event_rva':"EVENT_RVA",
+              'user':"USER",'computer':"COMPUTER",
+              'message':"MESSAGE",'strings':"STRINGS",'data':"DATA"}
 
 if ((len(sys.argv) != 3) and (len(sys.argv) != 2))\
        or (sys.argv[1] == '-h') or (sys.argv[1] == '--help'):
@@ -247,9 +90,9 @@ except Exception, inst:
     sys.exit(2)
 
 
-evt_file = "%s/logs/%s.evt" % (DB_PATH, LOG)
+evt_filename = "%s/logs/%s.evt" % (DB_PATH, LOG)
 try:
-    evt_handle = file(evt_file, "r")
+    evt_file = evtFile(evt_filename, msg_repo)
 except Exception, inst:
     print inst
     print "ERROR: Could not open log file."
@@ -257,35 +100,37 @@ except Exception, inst:
     sys.exit(2)
 
 
-if(guessRecordType(evt_handle) != 'header'):
+if(evt_file.guessRecordType() != 'header'):
     print "ERROR: file doesn't contain event log header."
     print "       Are you sure this is an event log?"
     sys.exit(3)
 
 
 # Begin parsing logic
-header = getHeaderRecord(evt_handle)
-csvwriter = csv.writer(sys.stdout)
+header = evt_file.getHeaderRecord()
+csvwriter = csv.DictWriter(sys.stdout, log_fields, '', 'ignore')
 csvwriter.writerow(header_rec)
 
-evt_handle.seek(header['next_off'])
-if(guessRecordType(evt_handle) != 'cursor'):
+evt_file.seek(header['next_off'])
+if(evt_file.guessRecordType() != 'cursor'):
     sys.stderr.write("WARNING: could not locate cursor record.\n")
     sys.stderr.write("         Naive parsing enabled.\n")
 
-    evt_handle.seek(0x30)
-    rec = getLogRecord(evt_handle)
+    evt_file.seek(0x30)
+    rec = evt_file.getLogRecord()
     while rec:
-        rec = map(quoteBinaryInString, rec)
+        for k in rec.keys():
+            rec[k] = quoteBinaryInString(rec[k])
         csvwriter.writerow(rec)
-        rec = getLogRecord(evt_handle)
+        rec = evt_file.getLogRecord()
     
 else:
-    cursor = getCursorRecord(evt_handle)
-    evt_handle.seek(cursor['first_off'])
+    cursor = evt_file.getCursorRecord()
+    evt_file.seek(cursor['first_off'])
     
-    rec = getLogRecord(evt_handle)
-    while rec and (evt_handle.tell() <= cursor['next_off']):
-        rec = map(quoteBinaryInString, rec)
+    rec = evt_file.getLogRecord()
+    while rec and (evt_file.tell() <= cursor['next_off']):
+        for k in rec.keys():
+            rec[k] = quoteBinaryInString(rec[k])
         csvwriter.writerow(rec)
-        rec = getLogRecord(evt_handle)
+        rec = evt_file.getLogRecord()

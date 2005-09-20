@@ -15,9 +15,25 @@
 
 import sys
 import os
+import time
 import re
 import struct
 import anydbm
+
+
+################################################################################
+# Constants
+
+# XXX: This mapping may not be entirely accurate.  In particular,
+#      FailureAudit and SuccessAudit were educated guesses.  The others
+#      appear to be correct.
+eventTypeEnum = ('FailureAudit',
+                 'Error',
+                 'Warning',
+                 'SuccessAudit',
+                 'Information')
+
+
 
 ################################################################################
 # String Formatting Functions
@@ -162,6 +178,186 @@ def formatMessage(fmt, vars):
                 extended_fmt += c
                 
     return ret_val
+
+
+
+################################################################################
+# .evt log files
+
+class evtFile:
+   f = None
+
+   def __init__(self, filename, message_repository):
+      self.f = file(filename, "r")
+      self.mr = message_repository
+
+   def tell(self):
+      return self.f.tell()
+
+   def seek(self, off):
+      self.f.seek(off)
+
+   def guessRecordType(self):
+      if not self.f:
+         # XXX: throw exception here instead?
+         return 'error'
+      
+      cur_pos = self.f.tell()
+      ret_val = 'unknown'
+
+      (size1,) = struct.unpack('<I', self.f.read(4))
+      if(size1 >= 28):
+         self.f.seek(size1-8,1)
+         (size2,) = struct.unpack('<I', self.f.read(4))
+         if(size2 == size1):
+            self.f.seek(4-size1,1)
+            if(size1 == 0x30):
+               magic = self.f.read(4)
+               if(magic == "\x4c\x66\x4c\x65"):
+                  ret_val = 'header'
+                
+            elif(size1 == 0x28):
+               magic = self.f.read(16)
+               if(magic == ("\x11\x11\x11\x11\x22\x22\x22\x22"
+                            +"\x33\x33\x33\x33\x44\x44\x44\x44")):
+                  ret_val = 'cursor'
+                
+            else:
+               magic = self.f.read(4)
+               if(magic == "\x4c\x66\x4c\x65"):
+                  ret_val = 'log'
+    
+      self.f.seek(cur_pos)
+      return ret_val
+
+
+   def getHeaderRecord(self):
+      fmt = '<IIIIIIIIIIII'
+      fmt_len = struct.calcsize(fmt)
+      # XXX: check for read failure
+      raw_rec = self.f.read(fmt_len)
+    
+      (size1,lfle,unknown1,unknown2,
+       first_off,next_off,next_num,first_num,
+       file_size,flags,retention,size2) = struct.unpack(fmt, raw_rec)
+      
+      flag_dirty =   flags & 0x1
+      flag_wrapped = flags & 0x2
+      flag_logfull = flags & 0x4
+      flag_primary = flags & 0x8
+
+      ret_val = {'first_off':first_off, 'first_num':first_num,
+                 'next_off':next_off, 'next_num':next_num,
+                 'file_size':file_size, 'retention':retention,
+                 'flag_dirty':flag_dirty, 'flag_wrapped':flag_wrapped,
+                 'flag_logfull':flag_logfull, 'flag_primary':flag_primary}
+      return ret_val
+
+
+   def getCursorRecord(self):
+      fmt = '<IIIIIIIIII'
+      fmt_len = struct.calcsize(fmt)
+      # XXX: check for read failure
+      raw_rec = self.f.read(fmt_len)
+    
+      (size1,magic1,magic2,magic3,magic4,
+       first_off,next_off,next_num,first_num,
+       size2) = struct.unpack(fmt, raw_rec)
+
+      ret_val = {'first_off':first_off, 'first_num':first_num,
+                 'next_off':next_off, 'next_num':next_num}
+      return ret_val
+
+
+   def getLogRecord(self):
+      # XXX: check for read failure
+      size_str = self.f.read(4)
+      if len(size_str) < 4:
+         return None
+      (size,) = struct.unpack('<I', size_str)
+    
+      fixed_fmt = '<IIIIHHHHHHIIIIII'
+      fixed_fmt_len = struct.calcsize(fixed_fmt)
+
+      # XXX: check for read failure
+      rec_str = self.f.read(size-4)
+      if len(rec_str) < fixed_fmt_len:
+         return {'msg_num':-1,'event_type':'',
+                 'date_created':'','date_written':'',
+                 'source':s.path.basename(sys.argv[0]), 'category':'',
+                 'event_id':'-1', 'event_rva':'',
+                 'user':'', 'computer':'',
+                 'message':"There was an error processing this event."\
+                           + "Binary record is not long enough.",
+                 'strings':'',
+                 'data':''}
+    
+      variable_str_len = len(rec_str) - fixed_fmt_len
+      (lfle,msg_num,
+       date_created,date_written,
+       event_id,event_rva_offset,
+       event_type,strcount,
+       category,unknown,
+       closing_record_number,string_offset,
+       sid_len,sid_offset,
+       data_len,data_offset,
+       variable_str) = struct.unpack("%s%ds" % (fixed_fmt, variable_str_len),
+                                     rec_str)
+      # Grab source and computer fields
+      # XXX: Need to properly handle unicode.
+      source_end = variable_str.find('\x00\x00')
+      source = variable_str[:source_end].replace('\x00', '')
+      tmp = variable_str[source_end+2:]
+      computer_end = tmp.find('\x00\x00')
+      computer = tmp[:computer_end].replace('\x00', '')
+      tmp = None
+    
+      # Grab SID
+      sid = 'N/A'
+      if sid_len > 0:
+         sid_str = rec_str[sid_offset-4:sid_offset+sid_len-4]
+         sid = binSIDtoASCII(sid_str)
+
+      # Grab template variables
+      strs = []
+      if string_offset > 0:
+         strs = rec_str[string_offset-4:data_offset-4].split('\x00\x00')
+         # XXX: Need to properly handle unicode.
+         tmp_strs = []
+         for s in strs:
+            tmp_strs.append(s.replace('\x00', ''))
+         strs = tmp_strs
+         tmp_strs = None
+
+      # Grab binary data chunk
+      data = ''
+      if data_len > 0:
+         data = rec_str[data_offset-4:data_offset+data_len-4]
+    
+      # Retrieve and process message template
+      event_rva = "%.8X"%(long(event_rva_offset)<<16|event_id)
+      message_template = self.mr.getMessageTemplate(source, event_rva)
+      message = ''
+      if message_template:
+         message = formatMessage(message_template, strs)
+      else:
+         sys.stderr.write("WARNING: Couldn't find message"\
+                          +" template for event record #%d\n" % msg_num)
+
+      # Format fields and return
+      return {'msg_num':msg_num,
+              'event_type':eventTypeEnum[event_type],
+              'date_created':time.strftime("%Y-%m-%d %H:%M:%S",
+                                           time.gmtime(date_created)),
+              'date_written':time.strftime("%Y-%m-%d %H:%M:%S",
+                                           time.gmtime(date_written)),
+              'source':source, 'category':category,
+              'event_id':event_id, 'event_rva':"0x%s" % event_rva,
+              'user':sid, 'computer':computer,
+              'message':message,
+              'strings':'|'.join(strs).strip('|'),
+              'data':data}
+
 
 
 
