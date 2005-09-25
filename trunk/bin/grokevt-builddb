@@ -26,13 +26,13 @@ import grokevt
 
 
 def usage():
-    print "USAGE:"
-    print "  %s <CONFIG_PROFILE> <OUTPUT_DIR>"\
-          % os.path.basename(sys.argv[0])
-    print
-    print "grokevt-builddb builds a database tree based on a single"
-    print "windows system for the purpose of event log conversion."
-    print "Please see the man page for more information."
+    sys.stderr.write("USAGE:\n")
+    sys.stderr.write("  %s <CONFIG_PROFILE> <OUTPUT_DIR>\n\n"
+                     % os.path.basename(sys.argv[0]))
+    sys.stderr.write("grokevt-builddb builds a database tree based on a\n")
+    sys.stderr.write("single windows system for the purpose of event log\n")
+    sys.stderr.write("conversion.  Please see the man page for more\n")
+    sys.stderr.write("information.\n")
 
 
 def unquoteString(s):
@@ -145,10 +145,10 @@ if len(sys.argv) != 3:
 CONFIG_PROFILE = sys.argv[1]
 PATH_OUTPUT = sys.argv[2]
 
-print "Loading configuration..."
+sys.stderr.write("Loading configuration...\n")
 config = grokevt.grokevtConfig(grokevt.PATH_CONFIG, CONFIG_PROFILE)
 
-print "Reading registry for service information..."
+sys.stderr.write("Reading registry for service information...\n")
 logs_query=(PATH_REGLOOKUP, "-H", "-t", "KEY", "-p", REGPATH_EVENTLOG,
             config.registry_path)
 child_proc = popen2.Popen3(logs_query, 1)
@@ -286,14 +286,14 @@ for lt in log_types.keys():
             else:
                 del log_types[lt][t][s]
 
-print "Writing service mappings..."
+sys.stderr.write("Writing service mappings...\n")
 makeOutputDirectories(PATH_OUTPUT, log_types.keys())
 writeServiceMapping(PATH_OUTPUT, log_types)
 
-print "Writing DLL databases..."
+sys.stderr.write("Writing DLL databases...\n")
 writeDBFiles(PATH_OUTPUT, names2paths)
 
-print "Copying log files..."
+sys.stderr.write("Copying log files...\n")
 try:
     for ei in evt_files.items():
         o = file("%s/logs/%s.evt" % (PATH_OUTPUT,ei[0]), "w+")
@@ -305,8 +305,8 @@ try:
         o.close()
         i.close()
 except Exception, inst:
-    print inst
-    print "ERROR: could not copy all log files."
+    sys.stderr.write("%s\n" % inst)
+    sys.stderr.write("ERROR: could not copy all log files.\n")
     sys.exit(2)
 
-print "Done."
+sys.stderr.write("Done.\n")
