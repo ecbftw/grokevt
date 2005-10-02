@@ -27,7 +27,7 @@ import grokevt
 
 def usage():
     sys.stderr.write("USAGE:\n")
-    sys.stderr.write("  %s <CONFIG_PROFILE> <OUTPUT_DIR>\n\n"
+    sys.stderr.write("  %s [-c CSID] <CONFIG_PROFILE> <OUTPUT_DIR>\n\n"
                      % os.path.basename(sys.argv[0]))
     sys.stderr.write("grokevt-builddb builds a database tree based on a\n")
     sys.stderr.write("single windows system for the purpose of event log\n")
@@ -129,18 +129,30 @@ def writeDBFiles(topdir, names2paths):
             sys.stderr.write(("WARNING: while reading %s and writing %s,"
                               +" grokevt-ripdll returned: %s\n")\
                              % (npi[1], outdb, l.strip()))
-
-
-if len(sys.argv) != 3:
+argv_len = len(sys.argv)
+if argv_len < 3:
     usage()
+    sys.stderr.write("ERROR: Requires at least 2 arguments.\n")
     sys.exit(1)
+elif sys.argv[1] == '-c':
+    if argv_len < 5:
+        usage()
+        sys.stderr.write("ERROR: -c requires parameter.\n")
+        sys.exit(1)
+    else:
+        CONTROL_SET_ID = int(sys.argv[2])
+        if CONTROL_SET_ID < 1:
+            usage()
+            sys.stderr.write("ERROR: CONTROL_SET_ID must be positive.\n")
+            sys.exit(1)
+        CONFIG_PROFILE = sys.argv[3]
+        PATH_OUTPUT = sys.argv[4]
+else:
+    CONFIG_PROFILE = sys.argv[1]
+    PATH_OUTPUT = sys.argv[2]
+    CONTROL_SET_ID = None
 
-CONFIG_PROFILE = sys.argv[1]
-PATH_OUTPUT = sys.argv[2]
-# XXX: accept some option on command line to set this
-CONTROL_SET_ID = None
 REGPATH_EVENTLOG = None
-
 CONTROL_SET_ID_PATH='/Select/Current'
 
 # XXX: should these be changed to absolute paths discovered at install time?
@@ -190,6 +202,7 @@ if child_ret > 0:
     sys.stderr.write(("WARNING: reglookup returned code: %d."
                       +"  Is reglookup in your path?\n") % child_ret)
 
+# XXX: what if REGPATH_EVENTLOG is wrong, and nothing comes back?
 l = child_proc.fromchild.readline()
 while l != '':
     l = l.split(',')[0][prefix_len:].lstrip('/').split('/')[0].strip()

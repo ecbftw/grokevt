@@ -7,7 +7,7 @@ grokevt-builddb
 
 
 =SYNOPSIS=
-	grokevt-builddb <CONFIG_PROFILE> <OUTPUT_DIR>
+	grokevt-builddb [-c CSID] <CONFIG_PROFILE> <OUTPUT_DIR>
 
 
 =DESCRIPTION=
@@ -24,6 +24,20 @@ grokevt-builddb
 	The key to successfully running this utility is proper
 	configuration.  Please see grokevt(7) for information on what
 	needs to be configured.
+
+
+=OPTIONS=
+	-c CSID		This option allows one to explicitly set which
+			ControlSet in the registry is used to extract
+			event log message mappings.    If specified,
+			this item must be a positive decimal integer.
+			If unspecified,	grokevt-builddb will attempt to
+			determine the best ControlSet by looking at the
+			most recent CurrentControlSet, stored in the
+			system registry under the path '/Select/Current'.
+			Most users should ignore this option unless
+			there is a specific reason why the last
+			CurrentControlSet should not be used.
 
 
 =ARGUMENTS=
@@ -43,11 +57,15 @@ grokevt-builddb
 	configuration profile 'win2k':
 	  **grokevt-builddb win2k ~/win2k.grokevt**
 
+	To repeat the last command, instead using registry information
+	explicitly from /ControlSet002:
+	  **grokevt-builddb -c 2 win2k ~/win2k.grokevt**
+
 
 =BUGS=
 	Probably many.  This should be considered unstable software.
 
-	This has undergone very little testing.
+	This has undergone little testing.
 
 
 =SEE ALSO=
