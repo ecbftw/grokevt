@@ -68,6 +68,9 @@ def find_message_off(f, num_entries, id):
     ret_val = None
     for i in range(0, num_entries):
         (lang_id, lang_offset) = unpack("<II", f)
+        # XXX: Should probably be generalized to extract all languages
+        #      in files and categorize them as such in the output DB
+        #      file.  
         if lang_id == 0x0409:  # 0x04: SUBLANG_ENGLISH_CAN, 0x09: LANG_ENGLISH
             ret_val = lang_offset
     return ret_val
@@ -159,7 +162,7 @@ def dump_pe(f,startoff,exesize):
             messages = {}
             for c in msg_tbl_chunks:
                 f.seek(c[2])
-                # Range is inclusive
+                # Address ranges are inclusive
                 for message_id in range(c[0],c[1]+1):
                     messages[message_id] = read_message_string(f)
                     #print "%.8X=>%s" % (message_id, messages[message_id])

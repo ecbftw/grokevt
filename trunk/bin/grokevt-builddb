@@ -131,29 +131,57 @@ def writeDBFiles(topdir, names2paths):
                              % (npi[1], outdb, l.strip()))
 
 
-# XXX: is this right?  Is there a better way to find the right ControlSet?
-REGPATH_EVENTLOG='/ControlSet001/Services/Eventlog'
-# XXX: should these be changed to absolute paths?
-PATH_REGLOOKUP='reglookup'
-PATH_RIPDLL='grokevt-ripdll'
-
-
 if len(sys.argv) != 3:
     usage()
     sys.exit(1)
 
 CONFIG_PROFILE = sys.argv[1]
 PATH_OUTPUT = sys.argv[2]
+# XXX: accept some option on command line to set this
+CONTROL_SET_ID = None
+REGPATH_EVENTLOG = None
+
+CONTROL_SET_ID_PATH='/Select/Current'
+
+# XXX: should these be changed to absolute paths discovered at install time?
+PATH_REGLOOKUP='reglookup'
+PATH_RIPDLL='grokevt-ripdll'
 
 sys.stderr.write("Loading configuration...\n")
 config = grokevt.grokevtConfig(grokevt.PATH_CONFIG, CONFIG_PROFILE)
 
 sys.stderr.write("Reading registry for service information...\n")
+
+# Need to determine correct 'CurrentControlSet', if not specified at
+# command line 
+if not CONTROL_SET_ID:
+    logs_query=(PATH_REGLOOKUP, "-H",
+                "-t", "DWORD", "-p", CONTROL_SET_ID_PATH,
+                config.registry_path)
+    child_proc = popen2.Popen3(logs_query, 1)
+    
+    child_ret = child_proc.wait()
+    if child_ret > 0:
+        sys.stderr.write(("WARNING: reglookup returned code: %d."
+                      +"  Is reglookup in your path?\n") % child_ret)
+
+    # XXX: what if no line is returned?
+    l = child_proc.fromchild.readline()
+    CONTROL_SET_ID = int(l.split(',')[2], 16)
+
+    for l in child_proc.childerr.readlines():
+        sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
+
+CONTROL_SET_PATH='/ControlSet%.3d' % CONTROL_SET_ID
+REGPATH_EVENTLOG='%s/Services/Eventlog' % CONTROL_SET_PATH
+
+sys.stderr.write("Using '%s' as CurrentControlSet path.\n" % CONTROL_SET_PATH)
+
+# Next, identify all log types by grabbing all keys under the eventlog key
 logs_query=(PATH_REGLOOKUP, "-H", "-t", "KEY", "-p", REGPATH_EVENTLOG,
             config.registry_path)
 child_proc = popen2.Popen3(logs_query, 1)
 
-# First, identify all log types by grabbing all keys under the eventlog key
 log_types = {}
 prefix_len = len(REGPATH_EVENTLOG)
 
@@ -166,7 +194,7 @@ l = child_proc.fromchild.readline()
 while l != '':
     l = l.split(',')[0][prefix_len:].lstrip('/').split('/')[0].strip()
     if l:
-        #XXX: do log names need to be case-squashed?
+        # XXX: do log names need to be case-squashed?
         log_types[unquoteString(l)] = None
     l = child_proc.fromchild.readline()
 
