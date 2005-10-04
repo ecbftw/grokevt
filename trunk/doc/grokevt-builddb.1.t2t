@@ -7,7 +7,7 @@ grokevt-builddb
 
 
 =SYNOPSIS=
-	grokevt-builddb \[-c CSID\] <CONFIG_PROFILE> <OUTPUT_DIR>
+	grokevt-builddb [ -c CSID ] <CONFIG_PROFILE> <OUTPUT_DIR>
 
 
 =DESCRIPTION=
