@@ -1,0 +1,224 @@
+#!/usr/bin/env python
+
+# This script parses a PE formatted file (EXE/DLL) and extracts the
+# message resources out of the .rsrc section.  They are then written to
+# a database file.
+#
+# Original PE header code borrowed from the pymavis project.
+# For more information, see: http://www.mplayerhq.hu/~arpi/pymavis/
+#
+# Copyright (C) 2005 Timothy D. Morgan
+# Copyright (C) 2004 A'rpi
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation version 2 of the
+# License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# $Id$
+
+
+import os
+import sys
+import string
+import struct
+import traceback
+import anydbm
+
+
+def usage():
+    print "USAGE:"
+    print "  %s <INPUT_DLL> <OUTPUT_DB>" % os.path.basename(sys.argv[0])
+    print
+    print "grokevt-ripdll is a tool for extracting message resources"
+    print "from a PE-formatted file.  Please see the man page for more"
+    print "information." 
+
+
+def unpack(fmt,f):
+    return struct.unpack(fmt,f.read(struct.calcsize(fmt)))
+
+
+def find_name_dir(f,num_dir_names,num_dir_ids):
+    ret_val = None
+    f.seek(f.tell()+8*num_dir_names)
+    for i in range(0,num_dir_ids):
+        (type_id, type_offset) = unpack("<II", f)
+        if type_id == 11:     # RT_MESSAGE constant
+            ret_val = type_offset & 0x7FFFFFFF
+    return ret_val
+
+
+def find_language_dir(f,num_dir_names,num_dir_ids):
+    ret_val = None
+    f.seek(f.tell()+8*num_dir_names)
+    for i in range(0,num_dir_ids):
+        (name_id, name_offset) = unpack("<II", f)
+        if name_id == 1:
+            ret_val = name_offset & 0x7FFFFFFF
+    return ret_val 
+
+
+def find_message_off(f, num_entries, id):
+    ret_val = None
+    for i in range(0, num_entries):
+        (lang_id, lang_offset) = unpack("<II", f)
+        # XXX: Should probably be generalized to extract all languages
+        #      in files and categorize them as such in the output DB
+        #      file.  
+        if lang_id == 0x0409:  # 0x04: SUBLANG_ENGLISH_CAN, 0x09: LANG_ENGLISH
+            ret_val = lang_offset
+    return ret_val
+
+
+def get_msg_tbl_params(f, sect_rva, sect_off):
+    (msg_tbl_rva, msg_tbl_len) = unpack("<II", f)
+    msg_tbl_off = msg_tbl_rva - sect_rva + sect_off
+    return (msg_tbl_rva, msg_tbl_len, msg_tbl_off)
+
+
+def read_message_string(f):
+    #XXX: 'unknown' doesn't appear to be number of lines, or number
+    #      of variables.  What is it?
+    (length,unknown) = unpack("<HH", f)
+    #XXX: Properly read unicode
+    return f.read(length-4).replace('\x00', '')
+
+
+def dump_pe(f,startoff,exesize):
+  dlllist=None
+  try:
+    # IMAGE_FILE_HEADER 0xD8
+    (zero,arch,numsects,timedate,
+     debug1,debug2,ophdrsize,charflags) = unpack("<HHHLLLHH",f)
+    
+    # IMAGE_OPTIONAL_HEADER 0xF0
+    (magic,lnkvers,size_code,size_data,size_bss,
+     rva1,rva2,rva3,loadaddr)=unpack("<HHLLLLLLL",f)
+    (sect_align,file_align,
+     os_ver,bin_ver,subsys_ver,win32_ver)=unpack("<LLLLLL",f)
+    (image_size,header_size,CRC,subsys,dllchr)=unpack("<LLLHH",f)
+    (stack_rvd,stack_com,heap_rvd,heap_com,
+     loader_flags,num_dirent)=unpack("<LLLLLL",f)
+
+    # IMAGE_DATA_DIRECTORYs
+    img_dir_entries=[]
+    for i in range(0,16):
+	tmp=unpack("<2L",f)
+        img_dir_entries.append(tmp)
+
+    # rva == relative virtual address
+    # Parse section headers.  Find the '.rsrc' section, and ignore rest.
+    for sno in range(numsects):
+	(raw_name,tmp,sect_rva,rawsize,sect_off,ptr_reloc,ptr_lno,
+         num_reloc,num_lno,flags)=unpack("<8sLLLLLLHHL",f)
+	sect_name=""
+	for c in raw_name:
+	    if ord(c)>=32:
+		sect_name+=c
+
+        if sect_name == '.rsrc':
+            f.seek(sect_off)
+            (rsrc_flags,date,majver,minver,
+             num_dir_names,num_dir_ids) = unpack("<IIHHHH", f)
+
+            # XXX: Comment all of this.
+            type_offset = f.tell()
+            msg_type_offset = find_name_dir(f, num_dir_names, num_dir_ids)
+            if msg_type_offset:
+                f.seek(sect_off+msg_type_offset)
+            else:
+                # XXX: Why does this happen?  For most of the files it occurs
+                #      on, there appear to be no message resources...
+                sys.stderr.write("Could not find msg_type_offset.\n");
+                return None
+            
+            (rsrc_flags,date,majver,minver,
+             num_dir_names,num_dir_ids) = unpack("<IIHHHH", f)
+            name_offset = find_language_dir(f, num_dir_names, num_dir_ids)
+            f.seek(sect_off+name_offset)
+
+            (rsrc_flags,date,majver,minver,
+             num_dir_names,num_dir_ids) = unpack("<IIHHHH", f)
+            msg_tbl_ptr = find_message_off(f, num_dir_ids, 0)
+            f.seek(sect_off+msg_tbl_ptr)
+
+            (msg_tbl_rva,
+             msg_tbl_len,
+             msg_tbl_off) = get_msg_tbl_params(f, sect_rva, sect_off)
+            f.seek(msg_tbl_off)
+
+            (msg_tbl_num_chunks,) = unpack("<I", f)
+            msg_tbl_chunks = []
+            for r in range(0,msg_tbl_num_chunks):
+                (va_from, va_to, msg_roff) = unpack("<III", f)
+                msg_tbl_chunks.append((va_from,va_to,msg_roff+msg_tbl_off))
+
+            messages = {}
+            for c in msg_tbl_chunks:
+                f.seek(c[2])
+                # Address ranges are inclusive
+                for message_id in range(c[0],c[1]+1):
+                    messages[message_id] = read_message_string(f)
+                    #print "%.8X=>%s" % (message_id, messages[message_id])
+
+            break;
+
+  except:
+    print "Exception!!! while PE-EXE parsing:"
+    traceback.print_exc()
+  return messages
+
+
+
+def dump_exe(f):
+    startoff=f.tell()
+    try:
+	(MZ,size_l,size_h,relocs,hdrsize,allocmin,allocmax,
+         SS,SP,CRC,CS,IP,relocoff,ovl) = unpack("<14H",f)
+	if not MZ in (0x5A4D,0x4D5A):
+            print "No M$ executable header found."
+	    return None
+    except:
+        print "Error during header parse:\n%s: %s\n\n%s" % sys.exc_info()
+    size=size_h*512
+    if size_l:
+	size+=size_l-512
+#    if relocoff>=0x40:
+    try:
+        # new-exe:
+	f.seek(startoff+0x3c)
+	ne_off,=unpack("<L",f)
+	f.seek(startoff+ne_off)
+	NE,=unpack("<H",f)
+	if NE==0x4550:
+	    return dump_pe(f,startoff,size)
+        else:
+            print "Does not appear to be a PE formatted file."
+            return None
+    except:
+        NE=0
+    return None
+
+
+if len(sys.argv) != 3:
+    usage()
+    sys.exit(1)
+
+dll_file = sys.argv[1]
+db_file = sys.argv[2]
+
+messages = dump_exe(file(sys.argv[1], 'r'))
+
+if messages != None:
+    db = anydbm.open(db_file, "n", 0644)
+    for msg in messages.items():
+        db["%.8X"%msg[0]] = msg[1]
+    db.sync()
+    db.close()
+

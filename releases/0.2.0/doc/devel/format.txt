@@ -1,0 +1,156 @@
+Windows Event Log Format Reference
+==================================
+
+Information on the header and cursor records is courtesy of Andreas
+Schuster.  The log record format is a combination of information from
+Jamie French and Tim's own guess & check, and additions by Andreas.
+Please see references.txt for more information.
+
+
+Header Record
+=============
+0. 32bits, little endian
+   record length in bytes, which is always 0x30
+
+1. char[4]
+   magic number, always "LfLe"
+
+2. 32bits, little endian
+   unknown (always 1, possibly part of a format version number)
+
+3. 32bits, little endian
+   unknown (always 1, possibly part of a format version number)
+
+4. 32bits, little endian
+   offset from beginning of file to the first record
+
+5. 32bits, little endian
+   offset from beginning of file to the next record to be written
+   (or is this really the cursor record?)
+
+6. 32bits, little endian
+   number of the next record to be written
+
+7. 32bits, little endian
+   number of the first record
+
+8. 32bits, little endian
+   filesize in bytes
+   (unreliable?)
+
+9. 32bits, little endian
+   flags
+
+10. 32bits, little endian
+    retention period in seconds
+
+11. 32bits, little endian
+    length repeated, always 0x30
+
+
+
+Cursor Record
+=============
+0. 32bits, little endian
+   record length in bytes, which is always 0x28
+
+1. 128bits
+   magic number, which is always:
+   "\x11\x11\x11\x11\x22\x22\x22\x22\x33\x33\x33\x33\x44\x44\x44\x44"
+
+2. 32bits, little endian
+   offset from beginning of file to the first log record
+
+3. 32bits, little endian
+   offset from beginning of file to the next record to be written
+   (or last record in file which has already be written?)
+
+4. uint32, little endian
+   number of the next record to be written
+
+5. uint32, little endian
+   number of the first record
+
+6. 32bits, little endian
+   length repeated, always 0x28
+
+
+
+Log Record
+==========
+0: 32bits, little endian
+   Length of record, in bytes, including these 4 bytes
+
+1: 32bits, fixed value
+   Magic number, with value:
+   1001100011001100100110001100101b or 0x4c664c65 or "LfLe"
+
+2: 32bits, little endian
+   Message Number
+
+3: 32bits, little endian
+   Date Created UTC/GMT, in seconds since the epoch(unix?).  
+
+4: 32bits, little endian
+   Date Written UTC/GMT, in seconds since the epoch(unix?).
+
+5: 32bits, little endian
+   Event ID and Offset
+   High two bytes are the offset into the windoze DLL which holds the
+   messages.  The two low order bytes are what is displayed to the user
+   as the Event ID.  The number taken as a whole is used to grab the
+   message from the DLL using the windoze FormatMessage() call.
+
+6: 16bits, little endian
+   Event Type
+   One of 5 values.
+
+7: 16bits, little endian
+   String Count 
+   The number of strings in the event? Not always accurate?
+
+8: 16bits, little endian
+   Category
+
+9: 16bits
+   UNKNOWN
+
+10: 32bits
+    UNKNOWN
+
+11: 32bits, little endian
+    Strings Offset
+    Pointer to a sequence of NULL terminated unicode strings
+    (NULL == '\x00\x00') used in the message template.  
+    This pointer is relative to the very beginning of the record.
+    The end of the strings section appears to be the beginning of the
+    other data section.
+
+12: 32bits, little endian
+    SID string length
+    Set to 0 if it isn't included.
+
+13: 32bits, little endian
+    SID pointer
+    This pointer is relative to the very beginning of the record.
+
+14: 32bits, little endian
+    Other data length
+    Length of supplimentary data included in log.  
+    0 if none exists.
+
+15: 32bits, little endian
+    Other data pointer
+    This pointer is relative to the very beginning of the record.
+
+16: variable length fields
+    16.1: NULL terminated unicode string (NULL == '\x00\x00')
+          The windoze log source.  This value is used to look up (using
+          the registry) what DLLs need to be searched for the proper
+          EventID message template.  
+
+    16.2: NULL terminated unicode string (NULL == '\x00\x00')
+          Computer Name which generated the log entry.
+
+    16.3: General buffer.  Everything here is pointed to by the
+          pointers in fields 11, 13, and 15.
