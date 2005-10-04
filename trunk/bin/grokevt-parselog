@@ -121,7 +121,7 @@ if print_loglist:
 
 try:
     if print_verbose:
-        sys.stderr.write("NOTICE: Opening message repository '%s'.\n" % DB_PATH)
+        sys.stderr.write("INFO: Opening message repository '%s'.\n" % DB_PATH)
     msg_repo = messageRepository(DB_PATH, LOG)
 except Exception, inst:
     sys.stderr.write("%s\n" % inst)
@@ -134,7 +134,7 @@ except Exception, inst:
 evt_filename = "%s/logs/%s.evt" % (DB_PATH, LOG)
 try:
     if print_verbose:
-        sys.stderr.write("NOTICE: Opening event log file at '%s'.\n"
+        sys.stderr.write("INFO: Opening event log file at '%s'.\n"
                          % evt_filename)
     evt_file = evtFile(evt_filename, msg_repo)
 except Exception, inst:
@@ -144,7 +144,7 @@ except Exception, inst:
     sys.exit(2)
 
 if print_verbose:
-    sys.stderr.write("NOTICE: Checking log file magic...\n")
+    sys.stderr.write("INFO: Checking log file magic...\n")
 if(evt_file.guessRecordType() != 'header'):
     sys.stderr.write("ERROR: File doesn't contain event log header.\n")
     sys.stderr.write("       Are you sure this is an event log?\n")
@@ -158,7 +158,7 @@ if print_header:
     csvwriter.writerow(header_rec)
 
 if print_verbose:
-    sys.stderr.write("NOTICE: Now parsing file...\n")
+    sys.stderr.write("INFO: Now parsing file...\n")
 evt_file.seek(header['next_off'])
 if(evt_file.guessRecordType() != 'cursor'):
     sys.stderr.write("WARNING: Could not locate cursor record.\n")

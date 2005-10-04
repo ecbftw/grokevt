@@ -159,13 +159,17 @@ CONTROL_SET_ID_PATH='/Select/Current'
 PATH_REGLOOKUP='reglookup'
 PATH_RIPDLL='grokevt-ripdll'
 
-sys.stderr.write("Loading configuration...\n")
+# XXX: INFO lines should eventually be turned off by default, with a verbose
+#      option to turn them on, (along with more verbose output).
+sys.stderr.write("INFO: Loading configuration...\n")
 config = grokevt.grokevtConfig(grokevt.PATH_CONFIG, CONFIG_PROFILE)
 
-sys.stderr.write("Reading registry for service information...\n")
+sys.stderr.write("INFO: Reading system registry for service information...\n")
 
 # Need to determine correct 'CurrentControlSet', if not specified at
 # command line 
+
+# XXX: Need to find a way to wrap reglookup calls up into a simple function.
 if not CONTROL_SET_ID:
     logs_query=(PATH_REGLOOKUP, "-H",
                 "-t", "DWORD", "-p", CONTROL_SET_ID_PATH,
@@ -187,7 +191,8 @@ if not CONTROL_SET_ID:
 CONTROL_SET_PATH='/ControlSet%.3d' % CONTROL_SET_ID
 REGPATH_EVENTLOG='%s/Services/Eventlog' % CONTROL_SET_PATH
 
-sys.stderr.write("Using '%s' as CurrentControlSet path.\n" % CONTROL_SET_PATH)
+sys.stderr.write("INFO: Using '%s' as CurrentControlSet path.\n"
+                 % CONTROL_SET_PATH)
 
 # Next, identify all log types by grabbing all keys under the eventlog key
 logs_query=(PATH_REGLOOKUP, "-H", "-t", "KEY", "-p", REGPATH_EVENTLOG,
@@ -327,14 +332,14 @@ for lt in log_types.keys():
             else:
                 del log_types[lt][t][s]
 
-sys.stderr.write("Writing service mappings...\n")
+sys.stderr.write("INFO: Writing service mappings...\n")
 makeOutputDirectories(PATH_OUTPUT, log_types.keys())
 writeServiceMapping(PATH_OUTPUT, log_types)
 
-sys.stderr.write("Writing DLL databases...\n")
+sys.stderr.write("INFO: Writing DLL databases...\n")
 writeDBFiles(PATH_OUTPUT, names2paths)
 
-sys.stderr.write("Copying log files...\n")
+sys.stderr.write("INFO: Copying log files...\n")
 try:
     for ei in evt_files.items():
         o = file("%s/logs/%s.evt" % (PATH_OUTPUT,ei[0]), "w+")
@@ -346,8 +351,8 @@ try:
         o.close()
         i.close()
 except Exception, inst:
-    sys.stderr.write("%s\n" % inst)
+    sys.stderr.write("ERROR: %s\n" % inst)
     sys.stderr.write("ERROR: could not copy all log files.\n")
     sys.exit(2)
 
-sys.stderr.write("Done.\n")
+sys.stderr.write("INFO: Done.\n")

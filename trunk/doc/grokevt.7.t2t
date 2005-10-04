@@ -51,7 +51,7 @@ GrokEVT
 	(by default at '/usr/local/etc/grokevt') you'll find a
 	sub-directory called 'systems'.  In there is a set of
 	system configuration profiles.  Each directory under 'systems'
-	represents the configuration for a single windows disk image.
+	represents the configuration for a single windows host.
 	You may create directories here of any name.  It is suggested
 	you use the host name of the system you wish to extract logs
 	from.
@@ -81,7 +81,7 @@ GrokEVT
 	  **echo '/mnt/win/c' > drives/c:**
 	
 	This will of course, overwrite that file with your actual mount
-	point for the C drive.  Do this for all drives mounted on your
+	point for the C: drive.  Do this for all drives mounted on your
 	windows system.
 
 	Next, you need to configure your %SystemRoot% path variable.
@@ -127,12 +127,13 @@ GrokEVT
 	To run grokevt-parselog(1), you must specify the database
 	directory that you generated with grokevt-builddb(1):
 
-	  **grokevt-parselog /var/db/grokevt/mysystem**
+	  **grokevt-parselog -l /var/db/grokevt/mysystem**
 
 	This will then print out all available log types, based on
 	information found previously in the system's registry.  Then you
-	may view one of those logs simply by adding it's name as the
-	second parameter.  For instance, to view the 'System' log:
+	may view one of those logs simply by dropping the -l option, and 
+	adding it's name as the	second parameter.  For instance, to view
+	the 'System' log:
 
 	  **grokevt-parselog /var/db/grokevt/mysystem System**
 
