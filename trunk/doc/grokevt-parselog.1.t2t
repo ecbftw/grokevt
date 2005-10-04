@@ -9,7 +9,9 @@ grokevt-parselog
 
 =SYNOPSIS=
 	grokevt-parselog -?|--help
+
 	grokevt-parselog -l <DATABASE_DIR>
+
 	grokevt-parselog [-v] [-H] [-h] <DATABASE_DIR> <LOG_TYPE>
 
 
@@ -27,7 +29,7 @@ grokevt-parselog
 			the original system are also stored in this
 			directory tree.
 
-	LOG_TYPE	This is the windows name for the log.  By
+	LOG_TYPE		This is the windows name for the log.  By
 			default windows has the following logs:
 
 			  Application
@@ -35,7 +37,7 @@ grokevt-parselog
 			  System
 
 			But others may have been created by third party
-			software.  Use the '-l' option to print a list
+			software.  Use the '**-l**' option to print a list
 			of all available log types.
 			(The log names are case-sensitive.)
 
@@ -45,7 +47,8 @@ grokevt-parselog
 	used together; refer to the synopsis for usage scenarios.
 
 	-?	Prints a basic usage statement.
-	--help
+
+	--help	Same as **-?**.
 
 	-l	Used to list the logs available in the specified
 		database.
