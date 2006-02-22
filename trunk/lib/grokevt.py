@@ -24,15 +24,14 @@ import anydbm
 ################################################################################
 # Constants
 
-# XXX: This mapping may not be entirely accurate.  In particular,
-#      FailureAudit and SuccessAudit were educated guesses.  The others
-#      appear to be correct.
-eventTypeEnum = ('FailureAudit',
-                 'Error',
-                 'Warning',
-                 'SuccessAudit',
-                 'Information')
-
+# This information provided by:
+#   http://technet2.microsoft.com/WindowsServer/en/Library/7e77c2f0-8835-4bea-b972-26edb2aceb3d1033.mspx
+eventTypeEnum = {0:'Success',
+                 1:'Error',
+                 2:'Warning',
+                 4:'Information',
+		 8:'SuccessAudit',
+		 16:'FailureAudit'}
 
 
 ################################################################################
@@ -344,10 +343,8 @@ class evtFile:
          sys.stderr.write("WARNING: Couldn't find message"\
                           +" template for event record #%d\n" % msg_num)
 
-      event_type_str = ''
-      if(event_type < len(eventTypeEnum)):
-         event_type_str = eventTypeEnum[event_type]
-      else:
+      event_type_str = eventTypeEnum.get(event_type, None)
+      if(!event_type_str)
          event_type_str = "Unknown(0x%.4X)" % event_type
 
       # Format fields and return

@@ -15,7 +15,7 @@ To obtain RegLookup, please see the project page at:
 
 You do not need to have RegLookup installed before installing this
 software, but you will need to have it installed and in your PATH
-whenver you run grokevt-builddb(1).
+whenever you run grokevt-builddb(1).
 
 
 Building
