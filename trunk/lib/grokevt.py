@@ -344,7 +344,7 @@ class evtFile:
                           +" template for event record #%d\n" % msg_num)
 
       event_type_str = eventTypeEnum.get(event_type, None)
-      if(!event_type_str)
+      if not event_type_str:
          event_type_str = "Unknown(0x%.4X)" % event_type
 
       # Format fields and return
