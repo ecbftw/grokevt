@@ -344,9 +344,15 @@ class evtFile:
          sys.stderr.write("WARNING: Couldn't find message"\
                           +" template for event record #%d\n" % msg_num)
 
+      event_type_str = ''
+      if(event_type < len(eventTypeEnum)):
+         event_type_str = eventTypeEnum[event_type]
+      else:
+         event_type_str = "Unknown(0x%.4X)" % event_type
+
       # Format fields and return
       return {'msg_num':msg_num,
-              'event_type':eventTypeEnum[event_type],
+              'event_type':event_type_str,
               'date_created':time.strftime("%Y-%m-%d %H:%M:%S",
                                            time.gmtime(date_created)),
               'date_written':time.strftime("%Y-%m-%d %H:%M:%S",
