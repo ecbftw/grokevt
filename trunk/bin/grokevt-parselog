@@ -29,6 +29,7 @@
 import sys
 import string
 import os
+import types
 import struct
 import re
 import time
@@ -168,7 +169,8 @@ if(evt_file.guessRecordType() != 'cursor'):
     rec = evt_file.getLogRecord()
     while rec:
         for k in rec.keys():
-            rec[k] = quoteBinaryInString(rec[k])
+            if(isinstance(rec[k], types.StringTypes)):
+                rec[k] = quoteBinaryInString(rec[k])
         csvwriter.writerow(rec)
         rec = evt_file.getLogRecord()
     
@@ -179,6 +181,7 @@ else:
     rec = evt_file.getLogRecord()
     while rec and (evt_file.tell() <= cursor['next_off']):
         for k in rec.keys():
-            rec[k] = quoteBinaryInString(rec[k])
+            if(isinstance(rec[k], types.StringTypes)):
+                rec[k] = quoteBinaryInString(rec[k])
         csvwriter.writerow(rec)
         rec = evt_file.getLogRecord()

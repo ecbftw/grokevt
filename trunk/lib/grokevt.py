@@ -33,6 +33,10 @@ eventTypeEnum = {0:'Success',
 		 8:'SuccessAudit',
 		 16:'FailureAudit'}
 
+# XXX: this probably never changes, but might be interesting to see if
+#      it is big endian on NT Alpha systems.
+string_encoding = 'utf-16le'
+
 
 ################################################################################
 # String Formatting Functions
@@ -61,14 +65,21 @@ def binSIDtoASCII(sid_str):
 # special characters are quoted in hex with the syntax '\xQQ' where QQ
 # is the hex ascii value of the quoted character.  specials must be a
 # sequence.
-def quoteBinaryInString(s, specials="\\"):
-    ret_val = ''
-    for c in str(s):
-        if (ord(c) < 32) or (ord(c) > 126) or (c in specials):
-            ret_val += ("\\x%.2X" % ord(c))
+def quoteBinaryInString(s, specials=u"\\"):
+    ret_val = u''
+    for c in s:
+        o = ord(c)
+        if (o < 32) or (o > 126) or (c in specials):
+            # XXX: not sure how to handle the unicode situation here.
+            #      Should we convert back to a UTF-16LE encoding
+            #      and then escape instead, or do something different?
+            if(o > 255):
+               ret_val += ("\\u%.4X" % o)
+            else:
+               ret_val += ("\\x%.2X" % o)
         else:
             ret_val += c
-
+    
     return ret_val
 
 
@@ -302,31 +313,27 @@ class evtFile:
        data_len,data_offset,
        variable_str) = struct.unpack("%s%ds" % (fixed_fmt, variable_str_len),
                                      rec_str)
+      # Grab template variables
+      strs = []
+      if string_offset > 0:
+         strs = rec_str[string_offset-4:data_offset-4].decode(string_encoding).split(u'\x00')
+      
       # Grab source and computer fields
-      # XXX: Need to properly handle unicode.
-      source_end = variable_str.find('\x00\x00')
-      source = variable_str[:source_end].replace('\x00', '')
-      tmp = variable_str[source_end+2:]
-      computer_end = tmp.find('\x00\x00')
-      computer = tmp[:computer_end].replace('\x00', '')
-      tmp = None
+      vstr = variable_str.decode(string_encoding).split(u'\x00', 2)
+      source = ''
+      if len(vstr) > 0:
+         source = vstr[0]
+
+      computer = ''
+      if len(vstr) > 1:
+         computer = vstr[1]
+      vstr = None
     
       # Grab SID
       sid = 'N/A'
       if sid_len > 0:
          sid_str = rec_str[sid_offset-4:sid_offset+sid_len-4]
          sid = binSIDtoASCII(sid_str)
-
-      # Grab template variables
-      strs = []
-      if string_offset > 0:
-         strs = rec_str[string_offset-4:data_offset-4].split('\x00\x00')
-         # XXX: Need to properly handle unicode.
-         tmp_strs = []
-         for s in strs:
-            tmp_strs.append(s.replace('\x00', ''))
-         strs = tmp_strs
-         tmp_strs = None
 
       # Grab binary data chunk
       data = ''
@@ -385,7 +392,7 @@ class messageRepository:
          
     def getMessageTemplate(self, service, rva):
         ret_val = None
-        mdbs = self.svc_dbs["event"].get(service.lower(), None)
+        mdbs = self.svc_dbs["event"].get(service.lower().encode('ascii'), None)
         if mdbs:
             for mdb in mdbs.split(':'):
                 ret_val = self.msg_dbs[mdb].get(rva, None)

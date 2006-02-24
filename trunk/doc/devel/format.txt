@@ -120,7 +120,7 @@ Log Record
 
 11: 32bits, little endian
     Strings Offset
-    Pointer to a sequence of NULL terminated unicode strings
+    Pointer to a sequence of NULL terminated UTF-16 strings
     (NULL == '\x00\x00') used in the message template.  
     This pointer is relative to the very beginning of the record.
     The end of the strings section appears to be the beginning of the
@@ -144,12 +144,12 @@ Log Record
     This pointer is relative to the very beginning of the record.
 
 16: variable length fields
-    16.1: NULL terminated unicode string (NULL == '\x00\x00')
+    16.1: NULL terminated UTF-16 string (NULL == '\x00\x00')
           The windoze log source.  This value is used to look up (using
           the registry) what DLLs need to be searched for the proper
           EventID message template.  
 
-    16.2: NULL terminated unicode string (NULL == '\x00\x00')
+    16.2: NULL terminated UTF-16 string (NULL == '\x00\x00')
           Computer Name which generated the log entry.
 
     16.3: General buffer.  Everything here is pointed to by the
