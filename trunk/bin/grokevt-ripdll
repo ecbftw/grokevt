@@ -29,6 +29,7 @@ import string
 import struct
 import traceback
 import anydbm
+from grokevt import *
 
 
 def usage():
@@ -86,8 +87,9 @@ def read_message_string(f):
     #XXX: 'unknown' doesn't appear to be number of lines, or number
     #      of variables.  What is it?
     (length,unknown) = unpack("<HH", f)
-    #XXX: Properly read unicode
-    return f.read(length-4).replace('\x00', '')
+    # XXX: is this the best way to decode/encode unicode?
+    return f.read(length-4).decode(source_encoding).encode(template_encoding)
+    #return f.read(length-4).replace('\x00', '')
 
 
 def dump_pe(f,startoff,exesize):

@@ -12,7 +12,7 @@ grokevt-parselog
 
 	grokevt-parselog -l <DATABASE_DIR>
 
-	grokevt-parselog [-v] [-H] [-h] <DATABASE_DIR> <LOG_TYPE>
+	grokevt-parselog [-v] [-H] [-h] [-U] [-u] <DATABASE_DIR> <LOG_TYPE>
 
 
 =DESCRIPTION=
@@ -57,11 +57,18 @@ grokevt-parselog
 		helpful for debugging.
 
 	-h	Prints a header row at the top of the CSV output
-		containing labels for each column.  This is on by
-		default.
+		containing labels for each column. **DEFAULT**
 
 	-H	Disables the printing of a header row.  This is useful
 		when grokevt-parselog is used in a script.
+
+	-u	Enables the UTF-8 output of some strings.  This can be
+		dangerous on terminals that aren't configured to support
+		UTF-8.  
+
+	-U	Disables the use of UTF-8 for output. Such strings are
+		instead converted to UTF-8 first, and then any remaining
+		non-ASCII characters are quoted. **DEFAULT** 
 
 
 =EXAMPLES=
@@ -84,7 +91,8 @@ grokevt-parselog
 	The file event log file format isn't 100% understood at this
 	time, and what is understood, isn't 100% implemented.
 
-	Unicode support is currently non-existent.
+	Unicode support is currently limited.  Any suggestions on how to
+	better handle unicode output would be appreciated.
 
 
 =SEE ALSO=

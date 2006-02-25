@@ -11,11 +11,13 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
+# vi:set tabsize=4:
 # $Id$
 
 import sys
 import os
 import time
+import types
 import re
 import struct
 import anydbm
@@ -35,7 +37,13 @@ eventTypeEnum = {0:'Success',
 
 # XXX: this probably never changes, but might be interesting to see if
 #      it is big endian on NT Alpha systems.
-string_encoding = 'utf-16le'
+source_encoding = 'utf-16le'
+
+# This is what we store message in when ripped from DLLs
+template_encoding = 'utf-8'
+
+# This is what we use if unicode output is enabled
+output_encoding = 'utf-8'
 
 
 ################################################################################
@@ -44,42 +52,47 @@ string_encoding = 'utf-16le'
 # Reference:
 #  http://blogs.msdn.com/oldnewthing/archive/2004/03/15/89753.aspx
 def binSIDtoASCII(sid_str):
-   auth = ((ord(sid_str[2])<<40)
-           | (ord(sid_str[3])<<32)
-           | (ord(sid_str[4])<<24)
-           | (ord(sid_str[5])<<16)
-           | (ord(sid_str[6])<<8)
-           | ord(sid_str[7]))
-   result = "S-%d-%d" % (ord(sid_str[0]), auth)
-   rest = sid_str[8:]
-   for i in range(0,ord(sid_str[1])):
-       if len(rest) >= 4:
-           next_int = struct.unpack('<I', rest[:4])[0]
-           rest = rest[4:]
-           result = "%s-%d" % (result, next_int)
+    auth = ((ord(sid_str[2])<<40)
+            | (ord(sid_str[3])<<32)
+            | (ord(sid_str[4])<<24)
+            | (ord(sid_str[5])<<16)
+            | (ord(sid_str[6])<<8)
+            | ord(sid_str[7]))
+    result = "S-%d-%d" % (ord(sid_str[0]), auth)
+    rest = sid_str[8:]
+    for i in range(0,ord(sid_str[1])):
+        if len(rest) >= 4:
+            next_int = struct.unpack('<I', rest[:4])[0]
+            rest = rest[4:]
+            result = "%s-%d" % (result, next_int)
 
-   return result
+    return result
 
 
 # Returns a string which contains s, except for non-printable or
 # special characters are quoted in hex with the syntax '\xQQ' where QQ
 # is the hex ascii value of the quoted character.  specials must be a
 # sequence.
-def quoteBinaryInString(s, specials=u"\\"):
-    ret_val = u''
+def quoteString(s, specials=u"\\"):
+    ret_val = ''
     for c in s:
         o = ord(c)
         if (o < 32) or (o > 126) or (c in specials):
-            # XXX: not sure how to handle the unicode situation here.
-            #      Should we convert back to a UTF-16LE encoding
-            #      and then escape instead, or do something different?
-            if(o > 255):
-               ret_val += ("\\u%.4X" % o)
-            else:
-               ret_val += ("\\x%.2X" % o)
+            ret_val += ("\\x%.2X" % o)
         else:
             ret_val += c
     
+    return ret_val
+
+
+def quoteUnicode(s, specials=u'\\\r\n'):
+    ret_val = u''
+    for c in s:
+        if c in specials:
+            ret_val += "\\x%.2X" % ord(c)
+        else:
+            ret_val += c
+
     return ret_val
 
 
@@ -316,10 +329,10 @@ class evtFile:
       # Grab template variables
       strs = []
       if string_offset > 0:
-         strs = rec_str[string_offset-4:data_offset-4].decode(string_encoding).split(u'\x00')
+         strs = rec_str[string_offset-4:data_offset-4].decode(source_encoding).split(u'\x00')
       
       # Grab source and computer fields
-      vstr = variable_str.decode(string_encoding).split(u'\x00', 2)
+      vstr = variable_str.decode(source_encoding).split(u'\x00', 2)
       source = ''
       if len(vstr) > 0:
          source = vstr[0]
@@ -397,8 +410,9 @@ class messageRepository:
             for mdb in mdbs.split(':'):
                 ret_val = self.msg_dbs[mdb].get(rva, None)
                 if ret_val:
+                    ret_val = ret_val.decode(template_encoding)
                     break
-      
+        
         return ret_val
 
 
@@ -457,6 +471,12 @@ class grokevtConfig:
                                  +" file '%s'.\n" % fp)
         
         return ret_val
+
+
+
+# This is only here to aide in debugging.
+# It will be overridden during a 'make install' below.
+PATH_CONFIG='/usr/local/etc/grokevt'
 
 
 ################################################################################
