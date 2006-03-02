@@ -33,12 +33,12 @@ from grokevt import *
 
 
 def usage():
-    print "USAGE:"
-    print "  %s <INPUT_DLL> <OUTPUT_DB>" % os.path.basename(sys.argv[0])
-    print
-    print "grokevt-ripdll is a tool for extracting message resources"
-    print "from a PE-formatted file.  Please see the man page for more"
-    print "information." 
+    sys.stderr.write("USAGE:\n")
+    sys.stderr.write("  %s <INPUT_DLL> <OUTPUT_DB>\n\n"
+                     % os.path.basename(sys.argv[0]))
+    sys.stderr.write("grokevt-ripdll is a tool for extracting message resources")
+    sys.stderr.write(" from a PE-formatted file.\nPlease see the man page for more")
+    sys.stderr.write(" information.\n\n")
 
 
 def unpack(fmt,f):
@@ -172,7 +172,7 @@ def dump_pe(f,startoff,exesize):
             break;
 
   except:
-    print "Exception!!! while PE-EXE parsing:"
+    sys.stderr.write("Exception!!! while PE-EXE parsing:\n")
     traceback.print_exc()
   return messages
 
@@ -184,10 +184,10 @@ def dump_exe(f):
 	(MZ,size_l,size_h,relocs,hdrsize,allocmin,allocmax,
          SS,SP,CRC,CS,IP,relocoff,ovl) = unpack("<14H",f)
 	if not MZ in (0x5A4D,0x4D5A):
-            print "No M$ executable header found."
+            sys.stderr.write("No M$ executable header found.\n")
 	    return None
     except:
-        print "Error during header parse:\n%s: %s\n\n%s" % sys.exc_info()
+        sys.stderr.write("Error during header parse:\n%s: %s\n\n%s\n" % sys.exc_info())
     size=size_h*512
     if size_l:
 	size+=size_l-512
@@ -201,7 +201,7 @@ def dump_exe(f):
 	if NE==0x4550:
 	    return dump_pe(f,startoff,size)
         else:
-            print "Does not appear to be a PE formatted file."
+            sys.stderr.write("Does not appear to be a PE formatted file.\n")
             return None
     except:
         NE=0

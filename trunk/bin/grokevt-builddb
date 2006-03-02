@@ -24,6 +24,15 @@ import popen2
 import anydbm
 import grokevt
 
+print_verbose = 1
+
+# XXX: should these be changed to absolute paths discovered at install time?
+PATH_REGLOOKUP='reglookup'
+PATH_RIPDLL='grokevt-ripdll'
+
+REGPATH_EVENTLOG = None
+CONTROL_SET_ID_PATH='/Select/Current'
+
 
 def usage():
     sys.stderr.write("USAGE:\n")
@@ -61,6 +70,22 @@ def windowsPathToUnixPath(path_list, variables, drives):
         ret_val.append(p)
 
     return ret_val
+
+
+def runRegLookupQuery(args):
+    a = [PATH_REGLOOKUP, '-H']
+    a.extend(args)
+
+    child_proc = popen2.Popen3(a, 1)
+    
+    for l in child_proc.childerr.readlines():
+        sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
+    child_ret = child_proc.wait()
+    if child_ret > 0:
+        sys.stderr.write("WARNING: reglookup returned code: %d." % child_ret
+                        +"  Is reglookup in your path?\n")
+
+    return child_proc.fromchild
 
 
 def buildShortNamesPathsDicts(paths):
@@ -116,19 +141,21 @@ def writeDBFiles(topdir, names2paths):
         db_call = (PATH_RIPDLL, npi[1], outdb)
         child_proc = popen2.Popen3(db_call, 1)
         
+        for l in child_proc.childerr.readlines():
+            sys.stderr.write(("WARNING: while reading %s and writing %s,"
+                              +" grokevt-ripdll returned: %s\n")\
+                             % (npi[1], outdb, l.strip()))
+        for l in child_proc.fromchild.readlines():
+            sys.stderr.write(("WARNING: while reading %s and writing %s,"
+                              +" grokevt-ripdll returned: %s\n")\
+                             % (npi[1], outdb, l.strip()))
         child_ret = child_proc.wait()
         if child_ret > 0:
             sys.stderr.write(("WARNING: grokevt-ripdll returned code: %d."
                               +"  Is it in your path?\n") % child_ret)
         
-        for l in child_proc.fromchild.readlines():
-            sys.stderr.write(("WARNING: while reading %s and writing %s,"
-                              +" grokevt-ripdll returned: %s\n")\
-                             % (npi[1], outdb, l.strip()))
-        for l in child_proc.childerr.readlines():
-            sys.stderr.write(("WARNING: while reading %s and writing %s,"
-                              +" grokevt-ripdll returned: %s\n")\
-                             % (npi[1], outdb, l.strip()))
+
+# Parse command line arguments
 argv_len = len(sys.argv)
 if argv_len < 3:
     usage()
@@ -152,141 +179,92 @@ else:
     PATH_OUTPUT = sys.argv[2]
     CONTROL_SET_ID = None
 
-REGPATH_EVENTLOG = None
-CONTROL_SET_ID_PATH='/Select/Current'
-
-# XXX: should these be changed to absolute paths discovered at install time?
-PATH_REGLOOKUP='reglookup'
-PATH_RIPDLL='grokevt-ripdll'
 
 # XXX: INFO lines should eventually be turned off by default, with a verbose
 #      option to turn them on, (along with more verbose output).
-sys.stderr.write("INFO: Loading configuration...\n")
+if print_verbose:
+    sys.stderr.write("INFO: Loading configuration...\n")
 config = grokevt.grokevtConfig(grokevt.PATH_CONFIG, CONFIG_PROFILE)
 
-sys.stderr.write("INFO: Reading system registry for service information...\n")
+if print_verbose:
+    sys.stderr.write("INFO: Reading system registry for service information...\n")
 
 # Need to determine correct 'CurrentControlSet', if not specified at
 # command line 
 
-# XXX: Need to find a way to wrap reglookup calls up into a simple function.
 if not CONTROL_SET_ID:
-    logs_query=(PATH_REGLOOKUP, "-H",
-                "-t", "DWORD", "-p", CONTROL_SET_ID_PATH,
-                config.registry_path)
-    child_proc = popen2.Popen3(logs_query, 1)
+    logs_query=["-t", "DWORD", "-p", CONTROL_SET_ID_PATH, config.registry_path]
+    fromchild = runRegLookupQuery(logs_query)
     
-    child_ret = child_proc.wait()
-    if child_ret > 0:
-        sys.stderr.write(("WARNING: reglookup returned code: %d."
-                      +"  Is reglookup in your path?\n") % child_ret)
-
     # XXX: what if no line is returned?
-    l = child_proc.fromchild.readline()
+    l = fromchild.readline()
     CONTROL_SET_ID = int(l.split(',')[2], 16)
 
-    for l in child_proc.childerr.readlines():
-        sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
 
 CONTROL_SET_PATH='/ControlSet%.3d' % CONTROL_SET_ID
 REGPATH_EVENTLOG='%s/Services/Eventlog' % CONTROL_SET_PATH
 
-sys.stderr.write("INFO: Using '%s' as CurrentControlSet path.\n"
-                 % CONTROL_SET_PATH)
+if print_verbose:
+    sys.stderr.write("INFO: Using '%s' as CurrentControlSet path.\n"
+                     % CONTROL_SET_PATH)
 
 # Next, identify all log types by grabbing all keys under the eventlog key
-logs_query=(PATH_REGLOOKUP, "-H", "-t", "KEY", "-p", REGPATH_EVENTLOG,
-            config.registry_path)
-child_proc = popen2.Popen3(logs_query, 1)
+logs_query=["-t", "KEY", "-p", REGPATH_EVENTLOG, config.registry_path]
+fromchild = runRegLookupQuery(logs_query)
 
 log_types = {}
 prefix_len = len(REGPATH_EVENTLOG)
-
-child_ret = child_proc.wait()
-if child_ret > 0:
-    sys.stderr.write(("WARNING: reglookup returned code: %d."
-                      +"  Is reglookup in your path?\n") % child_ret)
-
 # XXX: what if REGPATH_EVENTLOG is wrong, and nothing comes back?
-l = child_proc.fromchild.readline()
+l = fromchild.readline()
 while l != '':
     l = l.split(',')[0][prefix_len:].lstrip('/').split('/')[0].strip()
     if l:
         # XXX: do log names need to be case-squashed?
         log_types[unquoteString(l)] = None
-    l = child_proc.fromchild.readline()
-
-for l in child_proc.childerr.readlines():
-    sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
+    l = fromchild.readline()
 
 # Now, for each log type, grab the log file path and the list of all
 # services in the Sources MULTI_SZ
 files = {}
 evt_files = {}
 for lt in log_types.keys():
-    evt_query = (PATH_REGLOOKUP, "-H",
-                 "-t", "EXPAND_SZ",
+    evt_query = ["-t", "EXPAND_SZ",
                  "-p", "%s/%s/File" % (REGPATH_EVENTLOG,lt),
-                 config.registry_path)
-    child_proc = popen2.Popen3(evt_query, 1)
+                 config.registry_path]
+    fromchild = runRegLookupQuery(evt_query)
 
-    child_ret = child_proc.wait()
-    if child_ret > 0:
-        sys.stderr.write("WARNING: reglookup returned code: %d.\n" % child_ret)
-
-    l = child_proc.fromchild.readline().split(',')[2].strip()
+    l = fromchild.readline().split(',')[2].strip()
     evt_files[lt] = windowsPathToUnixPath(unquoteString(l),
                                           config.path_vars,
                                           config.drive_mapping)[0]
-    for l in child_proc.childerr.readlines():
-        sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
     
-    logs_query = (PATH_REGLOOKUP, "-H",
-                  "-t", "MULTI_SZ",
+    logs_query = ["-t", "MULTI_SZ",
                   "-p", "%s/%s/Sources" % (REGPATH_EVENTLOG,lt),
-                  config.registry_path)
-    child_proc = popen2.Popen3(logs_query, 1)
-
-    child_ret = child_proc.wait()
-    if child_ret > 0:
-        sys.stderr.write("WARNING: reglookup returned code: %d.\n" % child_ret)
+                  config.registry_path]
+    fromchild = runRegLookupQuery(logs_query)
 
     log_types[lt] = {}
     log_types[lt]["event"] = {}
     log_types[lt]["category"] = {}
     log_types[lt]["parameter"] = {}
     
-    
     # For each service under this log type, grab the associated event,
     # category, and parameter message file lists.
-    l = child_proc.fromchild.readline()
+    l = fromchild.readline()
     services = l.split(',')[2].split('|')
     for s in services:
         s = s.strip().lower()
         log_types[lt]["event"][s] = None
         log_types[lt]["category"][s] = None
         log_types[lt]["parameter"][s] = None
-        
-    for l in child_proc.childerr.readlines():
-        sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
-
 
     # Now grab whole tree under this log type and parse it
     lt_path = "%s/%s" % (REGPATH_EVENTLOG,lt)
     lt_path_len = len(lt_path)
-    dlls_query = (PATH_REGLOOKUP, "-H",
-                  "-p", lt_path,
-                  config.registry_path)
-    child_proc = popen2.Popen3(dlls_query, 1)
-    child_ret = child_proc.wait()
-    if child_ret > 0:
-        sys.stderr.write("WARNING: reglookup returned code: %d.\n"
-                         % child_ret)
-    child_proc.wait()
-    for l in child_proc.childerr.readlines():
-        sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
+    dlls_query = ["-p", lt_path, config.registry_path]
+    fromchild = runRegLookupQuery(dlls_query)
 
-    l = child_proc.fromchild.readline()
+    l = fromchild.readline()
     while l != '':
         fields = l.split(',')
         # trim unneeded prefix from path
@@ -309,7 +287,7 @@ for lt in log_types.keys():
                 # Retain unique list of file names
                 for f in log_types[lt][t][s]:
                     files[f] = None
-        l = child_proc.fromchild.readline()
+        l = fromchild.readline()
 
 (names2paths,paths2names) = buildShortNamesPathsDicts(files)
 
@@ -332,14 +310,17 @@ for lt in log_types.keys():
             else:
                 del log_types[lt][t][s]
 
-sys.stderr.write("INFO: Writing service mappings...\n")
+if print_verbose:
+    sys.stderr.write("INFO: Writing service mappings...\n")
 makeOutputDirectories(PATH_OUTPUT, log_types.keys())
 writeServiceMapping(PATH_OUTPUT, log_types)
 
-sys.stderr.write("INFO: Writing DLL databases...\n")
+if print_verbose:
+    sys.stderr.write("INFO: Writing DLL databases...\n")
 writeDBFiles(PATH_OUTPUT, names2paths)
 
-sys.stderr.write("INFO: Copying log files...\n")
+if print_verbose:
+    sys.stderr.write("INFO: Copying log files...\n")
 try:
     for ei in evt_files.items():
         o = file("%s/logs/%s.evt" % (PATH_OUTPUT,ei[0]), "w+")
@@ -355,4 +336,5 @@ except Exception, inst:
     sys.stderr.write("ERROR: could not copy all log files.\n")
     sys.exit(2)
 
-sys.stderr.write("INFO: Done.\n")
+if print_verbose:
+    sys.stderr.write("INFO: Done.\n")
