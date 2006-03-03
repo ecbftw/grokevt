@@ -76,7 +76,7 @@ LOG = None
 
 # Parse command line
 argv_len = len(sys.argv)
-if (argv_len < 2) or (sys.argv[1] == '-?') or (sys.argv[1] == '--help'):
+if (argv_len < 3) or (sys.argv[1] == '-?') or (sys.argv[1] == '--help'):
     usage()
     sys.exit(0)
 elif sys.argv[1] == '-l':

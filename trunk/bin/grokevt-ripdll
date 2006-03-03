@@ -188,6 +188,7 @@ def dump_exe(f):
 	    return None
     except:
         sys.stderr.write("Error during header parse:\n%s: %s\n\n%s\n" % sys.exc_info())
+        return None
     size=size_h*512
     if size_l:
 	size+=size_l-512
@@ -210,7 +211,7 @@ def dump_exe(f):
 
 if len(sys.argv) != 3:
     usage()
-    sys.exit(1)
+    sys.exit(os.EX_USAGE)
 
 dll_file = sys.argv[1]
 db_file = sys.argv[2]

@@ -24,8 +24,6 @@ import popen2
 import anydbm
 import grokevt
 
-print_verbose = 1
-
 # XXX: should these be changed to absolute paths discovered at install time?
 PATH_REGLOOKUP='reglookup'
 PATH_RIPDLL='grokevt-ripdll'
@@ -33,10 +31,11 @@ PATH_RIPDLL='grokevt-ripdll'
 REGPATH_EVENTLOG = None
 CONTROL_SET_ID_PATH='/Select/Current'
 
+missing_dlls = {}
 
 def usage():
     sys.stderr.write("USAGE:\n")
-    sys.stderr.write("  %s [-c CSID] <CONFIG_PROFILE> <OUTPUT_DIR>\n\n"
+    sys.stderr.write("  %s [-v] [-c CSID] <CONFIG_PROFILE> <OUTPUT_DIR>\n\n"
                      % os.path.basename(sys.argv[0]))
     sys.stderr.write("grokevt-builddb builds a database tree based on a\n")
     sys.stderr.write("single windows system for the purpose of event log\n")
@@ -103,7 +102,11 @@ def buildShortNamesPathsDicts(paths):
             ret_val1[sn+ext] = p
             ret_val2[p] = sn+ext
         else:
-            sys.stderr.write("WARNING: %s doesn't exist.\n" % p)
+            # XXX: this might be handy later
+            #missing_dlls[p] = paths[p]
+            sys.stderr.write("WARNING: %s doesn't exist.\n" % p
+                             + "WARNING:    (This may affect log output "
+                             + "for the following services: %s)\n" % paths[p])
     
     return (ret_val1, ret_val2)
 
@@ -119,7 +122,7 @@ def makeOutputDirectories(topdir, logs):
         if os.path.exists(p):
             if not os.path.isdir(p) or not os.access(p, os.W_OK):
                 sys.stderr.write("ERROR: Access denied to '%s'.\n" % p)
-                sys.exit(2)
+                sys.exit(os.EX_CANTCREAT)
         else:
             os.makedirs(p, 0755)
 
@@ -156,32 +159,42 @@ def writeDBFiles(topdir, names2paths):
         
 
 # Parse command line arguments
+CONTROL_SET_ID = None
+print_verbose = 0
+next_is_cid = 0
 argv_len = len(sys.argv)
 if argv_len < 3:
     usage()
     sys.stderr.write("ERROR: Requires at least 2 arguments.\n")
-    sys.exit(1)
-elif sys.argv[1] == '-c':
-    if argv_len < 5:
+    sys.exit(os.EX_USAGE)
+else:
+    for option in sys.argv[1:argv_len-2]:
+        if next_is_cid:
+            CONTROL_SET_ID = int(option)
+            if CONTROL_SET_ID < 1:
+                usage()
+                sys.stderr.write("ERROR: CONTROL_SET_ID must be positive.\n")
+                sys.exit(os.EX_USAGE)
+            next_is_cid = 0
+        elif option == '-v':
+            print_verbose = 1
+        elif option == '-c':
+            next_is_cid = 1
+        else:
+            usage()
+            sys.stderr.write("ERROR: Unrecognized option '%s'.\n" % option)
+            sys.exit(os.EX_USAGE)
+
+    if next_is_cid:
         usage()
         sys.stderr.write("ERROR: -c requires parameter.\n")
-        sys.exit(1)
-    else:
-        CONTROL_SET_ID = int(sys.argv[2])
-        if CONTROL_SET_ID < 1:
-            usage()
-            sys.stderr.write("ERROR: CONTROL_SET_ID must be positive.\n")
-            sys.exit(1)
-        CONFIG_PROFILE = sys.argv[3]
-        PATH_OUTPUT = sys.argv[4]
-else:
-    CONFIG_PROFILE = sys.argv[1]
-    PATH_OUTPUT = sys.argv[2]
-    CONTROL_SET_ID = None
+        sys.exit(os.EX_USAGE)
+        
+
+CONFIG_PROFILE=sys.argv[argv_len-2]
+PATH_OUTPUT=sys.argv[argv_len-1]
 
 
-# XXX: INFO lines should eventually be turned off by default, with a verbose
-#      option to turn them on, (along with more verbose output).
 if print_verbose:
     sys.stderr.write("INFO: Loading configuration...\n")
 config = grokevt.grokevtConfig(grokevt.PATH_CONFIG, CONFIG_PROFILE)
@@ -284,9 +297,12 @@ for lt in log_types.keys():
                   = windowsPathToUnixPath(unquoteString(fields[2].strip()),
                                           config.path_vars,
                                           config.drive_mapping)
-                # Retain unique list of file names
+                # Retain unique list of file names and their associated services
                 for f in log_types[lt][t][s]:
-                    files[f] = None
+                    if files.has_key(f):
+                        files[f] = files[f]+","+s
+                    else:
+                        files[f] = s
         l = fromchild.readline()
 
 (names2paths,paths2names) = buildShortNamesPathsDicts(files)
@@ -334,7 +350,7 @@ try:
 except Exception, inst:
     sys.stderr.write("ERROR: %s\n" % inst)
     sys.stderr.write("ERROR: could not copy all log files.\n")
-    sys.exit(2)
+    sys.exit(os.EX_IOERR)
 
 if print_verbose:
     sys.stderr.write("INFO: Done.\n")
