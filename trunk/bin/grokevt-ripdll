@@ -88,7 +88,8 @@ def read_message_string(f):
     #      of variables.  What is it?
     (length,unknown) = unpack("<HH", f)
     # XXX: is this the best way to decode/encode unicode?
-    return f.read(length-4).decode(source_encoding).encode(template_encoding)
+    return f.read(length-4).decode(source_encoding,
+                                   'replace').encode(template_encoding)
     #return f.read(length-4).replace('\x00', '')
 
 

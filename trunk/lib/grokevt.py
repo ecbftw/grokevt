@@ -73,7 +73,7 @@ def binSIDtoASCII(sid_str):
 # special characters are quoted in hex with the syntax '\xQQ' where QQ
 # is the hex ascii value of the quoted character.  specials must be a
 # sequence.
-def quoteString(s, specials=u"\\"):
+def quoteString(s, specials="\\"):
     ret_val = ''
     for c in s:
         o = ord(c)
@@ -329,19 +329,20 @@ class evtFile:
       # Grab template variables
       strs = []
       if string_offset > 0:
-         strs = rec_str[string_offset-4:data_offset-4].decode(source_encoding).split(u'\x00')
+         strs = rec_str[string_offset-4:data_offset-4].decode(source_encoding, 'replace').split(u'\x00')
       
       # Grab source and computer fields
-      vstr = variable_str.decode(source_encoding).split(u'\x00', 2)
+      vstr = variable_str.decode(source_encoding,
+                                 'replace').split(u'\x00', 2)
       source = ''
       if len(vstr) > 0:
          source = vstr[0]
-
+      
       computer = ''
       if len(vstr) > 1:
          computer = vstr[1]
       vstr = None
-    
+      
       # Grab SID
       sid = 'N/A'
       if sid_len > 0:
@@ -360,8 +361,9 @@ class evtFile:
       if message_template:
          message = formatMessage(message_template, strs)
       else:
-         sys.stderr.write("WARNING: Couldn't find message"\
-                          +" template for event record #%d\n" % msg_num)
+         sys.stderr.write("WARNING: Missing message"\
+                          +" template for event record #%d.  (service: %s)\n"
+                          % (msg_num, source))
 
       event_type_str = eventTypeEnum.get(event_type, None)
       if not event_type_str:
@@ -410,6 +412,9 @@ class messageRepository:
             for mdb in mdbs.split(':'):
                 ret_val = self.msg_dbs[mdb].get(rva, None)
                 if ret_val:
+                    # Templates shouldn't have any encoding issues.
+                    # If they do, we want to know about them, since this
+                    # means there's a bug in builddb.
                     ret_val = ret_val.decode(template_encoding)
                     break
         
