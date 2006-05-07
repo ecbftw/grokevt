@@ -37,6 +37,29 @@ import csv
 from grokevt import *
 
 
+meta_fields=('header_first_off', 'cursor_first_off',
+             'header_first_num', 'cursor_first_num',
+             'header_next_off', 'cursor_next_off',
+             'header_next_num', 'cursor_next_num',
+             'header_file_size', 'real_file_size',
+             'retention_period',
+             'flag_dirty', 'flag_wrapped',
+             'flag_logfull', 'flag_primary')
+
+meta_header={'header_first_off':"HEADER_FIRST_OFFSET",
+             'cursor_first_off':"CURSOR_FIRST_OFFSET",
+             'header_first_num':"HEADER_FIRST_NUMBER",
+             'cursor_first_num':"CURSOR_FIRST_NUMBER",
+             'header_next_off':"HEADER_NEXT_OFFSET",
+             'cursor_next_off':"CURSOR_NEXT_OFFSET",
+             'header_next_num':"HEADER_NEXT_NUMBER",
+             'cursor_next_num':"CURSOR_NEXT_NUMBER",
+             'header_file_size':"HEADER_FILE_SIZE",
+             'real_file_size':"REAL_FILE_SIZE",
+             'retention_period':"RETENTION_PERIOD",
+             'flag_dirty':"DIRTY", 'flag_wrapped':"WRAPPED",
+             'flag_logfull':"LOGFULL", 'flag_primary':"PRIMARY"}
+
 log_fields =("msg_num","event_type",
              "date_created","date_written",
              "source","category",
@@ -44,7 +67,7 @@ log_fields =("msg_num","event_type",
              "user","computer",
              "message","strings","data")
 
-header_rec = {'msg_num':"MSG_NUM",'event_type':"EVENT_TYPE",
+log_header = {'msg_num':"MSG_NUM",'event_type':"EVENT_TYPE",
               'date_created':"DATE_CREATED",'date_written':"DATE_WRITTEN",
               'source':"SOURCE",'category':"CATEGORY",
               'event_id':"EVENT_ID",'event_rva':"EVENT_RVA",
@@ -58,6 +81,7 @@ def usage():
         "USAGE:\n"\
         +"  %s -?|--help\n" % command\
         +"  %s -l <DATABASE_DIR>\n" % command\
+        +"  %s -m <DATABASE_DIR> <LOG_TYPE>\n" % command\
         +"  %s [-v] [-H] [-h] [-U] [-u] <DATABASE_DIR> <LOG_TYPE>\n\n"\
         % command\
         +"This program parses a windows event log and prints a\n"\
@@ -66,7 +90,8 @@ def usage():
 
 
 # Globals influenced by command line options
-print_loglist = 0
+mode_loglist = 0
+mode_meta = 0
 print_verbose = 0
 print_header = 1
 print_unicode = 0
@@ -81,11 +106,20 @@ if (argv_len < 3) or (sys.argv[1] == '-?') or (sys.argv[1] == '--help'):
     sys.exit(0)
 elif sys.argv[1] == '-l':
     if argv_len == 3:
-        print_loglist = 1
+        mode_loglist = 1
         DB_PATH=sys.argv[2]
     else:
         usage()
-        sys.stderr.write("ERROR: Incorrect usage for log list command.\n")
+        sys.stderr.write("ERROR: Incorrect usage for log list mode.\n")
+        sys.exit(1)
+elif sys.argv[1] == '-m':
+    if argv_len == 4:
+        mode_meta = 1
+        DB_PATH=sys.argv[2]
+        LOG=sys.argv[3]
+    else:
+        usage()
+        sys.stderr.write("ERROR: Incorrect usage for meta information mode.\n")
         sys.exit(1)
 else:
     if (argv_len >= 3):
@@ -113,7 +147,7 @@ else:
         sys.exit(1)
 
 
-if print_loglist:
+if mode_loglist:
     try:
         logs = os.listdir("%s/services" % DB_PATH)
         for l in logs:
@@ -124,7 +158,6 @@ if print_loglist:
         sys.stderr.write("       Did you run grokevt-builddb first?\n")
         sys.exit(2)
     sys.exit(0)
-
 
 try:
     if print_verbose:
@@ -138,60 +171,94 @@ except Exception, inst:
     sys.exit(2)
 
 
+evt_file = None
 evt_filename = "%s/logs/%s.evt" % (DB_PATH, LOG)
 try:
     if print_verbose:
         sys.stderr.write("INFO: Opening event log file at '%s'.\n"
                          % evt_filename)
     evt_file = evtFile(evt_filename, msg_repo)
+
+except ValueError, inst:
+    sys.stderr.write("ERROR: %s\n" % inst)
+    sys.stderr.write("       Are you sure this is an event log?\n")
+    sys.exit(3)
 except Exception, inst:
     sys.stderr.write("%s\n" % inst)
     sys.stderr.write("ERROR: Could not open log file.\n")
     sys.stderr.write("       Did grokevt-builddb finish without errors?\n")
     sys.exit(2)
 
-if print_verbose:
-    sys.stderr.write("INFO: Checking log file magic...\n")
-if(evt_file.guessRecordType() != 'header'):
-    sys.stderr.write("ERROR: File doesn't contain event log header.\n")
-    sys.stderr.write("       Are you sure this is an event log?\n")
-    sys.exit(3)
 
-
+evt_size = evt_file.size()
 # Begin parsing logic
-header = evt_file.getHeaderRecord()
+if mode_meta:
+    csvwriter = csv.DictWriter(sys.stdout, meta_fields, '', 'ignore')
+    row = {'header_first_off':evt_file.header['first_off'],
+           'cursor_first_off':evt_file.cursor['first_off'],
+           'header_first_num':evt_file.header['first_num'],
+           'cursor_first_num':evt_file.cursor['first_num'],
+           'header_next_off':evt_file.header['next_off'],
+           'cursor_next_off':evt_file.cursor['next_off'],
+           'header_next_num':evt_file.header['next_num'],
+           'cursor_next_num':evt_file.cursor['next_num'],
+           'header_file_size':evt_file.header['file_size'],
+           'real_file_size':evt_size,
+           'retention_period':evt_file.header['retention'],
+           'flag_dirty':evt_file.header['flag_dirty'],
+           'flag_wrapped':evt_file.header['flag_wrapped'],
+           'flag_logfull':evt_file.header['flag_logfull'],
+           'flag_primary':evt_file.header['flag_primary']}
+    csvwriter.writerow(meta_header)
+    csvwriter.writerow(row)
+    sys.exit(0)
+
 csvwriter = csv.DictWriter(sys.stdout, log_fields, '', 'ignore')
 if print_header:
-    csvwriter.writerow(header_rec)
+    csvwriter.writerow(log_header)
 
 if print_verbose:
-    sys.stderr.write("INFO: Now parsing file...\n")
-evt_file.seek(header['next_off'])
-if(evt_file.guessRecordType() != 'cursor'):
-    sys.stderr.write("WARNING: Could not locate cursor record.\n")
-    sys.stderr.write("         Naive parsing enabled.\n")
+    sys.stderr.write("INFO: Now parsing file.\n")
+    
+if evt_file.header['flag_dirty']:
+    sys.stderr.write("WARNING: Log file marked as dirty.\n")
 
-    evt_file.seek(0x30)
-    rec = evt_file.getLogRecord()
-    while rec:
-        for k in rec.keys():
-            if type(rec[k]) == types.StringType:
-                rec[k] = quoteString(rec[k])
-            elif type(rec[k]) == types.UnicodeType:
-                if print_unicode:
-                    rec[k] = quoteUnicode(rec[k]).encode(output_encoding)
-                else:
-                    rec[k] = quoteString(rec[k].encode(output_encoding))
-        
-        csvwriter.writerow(rec)
-        rec = evt_file.getLogRecord()
+if evt_file.cursor == None:
+    sys.stderr.write("WARNING: Naive parsing enabled.\n")
     
+    while evt_file.tell() < evt_size:
+        record_type = evt_file.guessRecordType()
+        if record_type == 'log':
+            rec = evt_file.getLogRecord()
+            for k in rec.keys():
+                if type(rec[k]) == types.StringType:
+                    rec[k] = quoteString(rec[k])
+                elif type(rec[k]) == types.UnicodeType:
+                    if print_unicode:
+                        rec[k] = quoteUnicode(rec[k]).encode(output_encoding)
+                    else:
+                        rec[k] = quoteString(rec[k].encode(output_encoding))
+        
+            csvwriter.writerow(rec)
+
+        elif record_type == 'cursor':
+            sys.stderr.write("WARNING: Skipping potential cursor record.\n")
+            evt_file.seek(evt_file.tell()+evt_file.cursor_size)
+            
+        elif record_type == 'header':
+            sys.stderr.write("WARNING: Skipping potential header record.\n")
+            evt_file.seek(evt_file.tell()+evt_file.header_size)
+            
+        elif record_type == 'unknown':
+            sys.stderr.write("ERROR: Reached unknown record type.")
+            sys.stderr.write("ERROR: Stopped parsing at offset: %d\n"
+                             % evt_file.tell())
+            break
+        
 else:
-    cursor = evt_file.getCursorRecord()
-    evt_file.seek(cursor['first_off'])
-    
-    rec = evt_file.getLogRecord()
-    while rec and (evt_file.tell() <= cursor['next_off']):
+    while evt_file.tell() < evt_file.cursor['next_off']:
+        #XXX: catch exceptions
+        rec = evt_file.getLogRecord()
         for k in rec.keys():
             if type(rec[k]) == types.StringType:
                 rec[k] = quoteString(rec[k])
@@ -201,6 +268,4 @@ else:
                 else:
                     rec[k] = quoteString(rec[k].encode(output_encoding))
         
-        
         csvwriter.writerow(rec)
-        rec = evt_file.getLogRecord()

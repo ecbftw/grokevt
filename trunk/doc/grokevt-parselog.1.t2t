@@ -12,6 +12,8 @@ grokevt-parselog
 
 	grokevt-parselog -l <DATABASE_DIR>
 
+	grokevt-parselog -m <DATABASE_DIR> <LOG_TYPE>
+
 	grokevt-parselog [-v] [-H] [-h] [-U] [-u] <DATABASE_DIR> <LOG_TYPE>
 
 
@@ -50,11 +52,16 @@ grokevt-parselog
 
 	--help	Same as **-?**.
 
-	-l	Used to list the logs available in the specified
+	-l	Log list mode. Lists the logs available in the specified
 		database.
 
-	-v	Verbose mode.  Prints status messages to stderr, and is
-		helpful for debugging.
+	-m	Meta information mode. Lists meta information stored in 
+		the header of the specified log file. Does not print any 
+		actual log records. (Format of output in this mode is 
+		still subject to change.)
+
+	-v	Verbose mode.  Prints status messages to stderr, which 
+		can be is helpful for debugging.
 
 	-h	Prints a header row at the top of the CSV output
 		containing labels for each column. **DEFAULT**

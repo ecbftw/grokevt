@@ -9,37 +9,63 @@ Please see references.txt for more information.
 
 Header Record
 =============
-0. 32bits, little endian
-   record length in bytes, which is always 0x30
+0.  32bits, little endian
+    record length in bytes, which is always 0x30
 
-1. char[4]
-   magic number, always "LfLe"
+1.  char[4]
+    magic number, always "LfLe"
 
-2. 32bits, little endian
-   unknown (always 1, possibly part of a format version number)
+2.  32bits, little endian
+    unknown (always 1, possibly part of a format version number)
 
-3. 32bits, little endian
-   unknown (always 1, possibly part of a format version number)
+3.  32bits, little endian
+    unknown (always 1, possibly part of a format version number)
 
-4. 32bits, little endian
-   offset from beginning of file to the first record
+4.  32bits, little endian
+    offset from beginning of file to the first record
 
-5. 32bits, little endian
-   offset from beginning of file to the next record to be written
-   (or is this really the cursor record?)
+5.  32bits, little endian
+    offset from beginning of file to the next record to be written
+    (or is this really the cursor record?)
 
-6. 32bits, little endian
-   number of the next record to be written
+6.  32bits, little endian
+    number of the next record to be written
 
-7. 32bits, little endian
-   number of the first record
+7.  32bits, little endian
+    number of the first record
 
-8. 32bits, little endian
-   filesize in bytes
-   (unreliable?)
+8.  32bits, little endian
+    filesize in bytes
+    (unreliable?)
 
-9. 32bits, little endian
-   flags
+9.  32bits, little endian
+    flags:
+      0x1 (DIRTY): This flag is set upon the first write. In my opinion
+                   it is the most important flag. If it is set, you
+                   can't rely on any of the other fields provided in the
+                   header record.
+
+      0x2 (WRAPPED): This flag indicates a wrapped log. That means, the
+                     newest event record is at a lower offset than the
+                     oldest one. This flag is updated only during
+                     shutdown of the service. 
+
+      0x4 (LOGFULL): This flag is set as soon as a record could not be
+                     written because there's not:
+                       1. enough free space left in the file AND
+                       2. the file could not grow any further 
+                          (no space left on device, MaxSize reached) AND
+                       3. AutoBackupLogFiles is not configured AND
+                       4. Retention does not allow to overwrite the
+                          oldest event record. 
+
+      0x8 (PRIMARY): I doubt that I completely understand this flag.
+                     It's set in all configured and active log files
+                     I've seen so far. It's cleared in all files written
+                     by BackupEventLog(). Maybe this flag is used to
+                     disable some checks while opening the file. For
+                     sure I'll still have to spend some time playing
+                     around with that flag. 
 
 10. 32bits, little endian
     retention period in seconds

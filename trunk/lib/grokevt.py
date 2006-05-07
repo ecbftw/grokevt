@@ -208,180 +208,277 @@ def formatMessage(fmt, vars):
 # .evt log files
 
 class evtFile:
-   f = None
+    # useful constants
+    cursor_magic = "\x11\x11\x11\x11\x22\x22\x22\x22"\
+                 + "\x33\x33\x33\x33\x44\x44\x44\x44"
+    header_size = 0x30
+    cursor_size = 0x28
+    
+    # instance state
+    f = None
+    header = None
+    cursor_offset = None
+    cursor = None
 
-   def __init__(self, filename, message_repository):
-      self.f = file(filename, "r")
-      self.mr = message_repository
 
-   def tell(self):
-      return self.f.tell()
+    # Constructor for evtFile instances
+    # Opens a log file and an associated message repository.
+    # Optionally parses the .evt file's meta records (header and cursor).
+    # 
+    # Raises: IOError, EOFError
+    # Resulting offset:
+    #    (error thrown)                      --> UNDEFINED
+    #    (parse_meta == 0)                   --> 0
+    #    (parse_meta == 1 && missing cursor) --> 0x30
+    #    (parse_meta == 1 && found cursor)   --> self.cursor['first_off']
+    #
+    def __init__(self, filename, message_repository, parse_meta=1):
+        self.f = file(filename, "r")
+        self.mr = message_repository
+        if parse_meta:
+            # First parse header
+            if(self.guessRecordType() != 'header'):
+                # XXX: use different exception class here
+                raise ValueError, "File header is not an event log header."
+            self.header = self.getHeaderRecord()
 
-   def seek(self, off):
-      self.f.seek(off)
+            # Next, try to find the cursor
+            self.f.seek(self.header['next_off'])
+            if(self.guessRecordType() != 'cursor'):
+                sys.stderr.write("WARNING: Header does not point "\
+                                +"to cursor record.\n")
+                sys.stderr.write("WARNING: Searching for cursor manually...\n")
 
-   def guessRecordType(self):
-      if not self.f:
-         # XXX: throw exception here instead?
-         return 'error'
-      
-      cur_pos = self.f.tell()
-      ret_val = 'unknown'
+                # XXX: This is kinda ugly.
+                #      Perhaps the whole file should be mmapped from the
+                #      beginning?
+                self.f.seek(0)
+                s = self.f.read()
+                self.f.seek(0)
 
-      (size1,) = struct.unpack('<I', self.f.read(4))
-      if(size1 >= 28):
-         self.f.seek(size1-8,1)
-         (size2,) = struct.unpack('<I', self.f.read(4))
-         if(size2 == size1):
-            self.f.seek(4-size1,1)
-            if(size1 == 0x30):
-               magic = self.f.read(4)
-               if(magic == "\x4c\x66\x4c\x65"):
-                  ret_val = 'header'
+                if s.count(self.cursor_magic) > 1:
+                    sys.stderr.write("WARNING: Multiple cursors may exist."\
+                                    +"  Attempting to use last one in file.\n")
+
+                # Search for the cursor magic and attempt to validate the record
+                magic_off = s.rfind(self.cursor_magic)
+                if magic_off > 3:
+                    self.f.seek(magic_off-4)
+                while (self.guessRecordType() != 'cursor'):
+                    magic_off = s.rfind(self.cursor_magic, magic_off-1)
+                    if magic_off > 3:
+                        self.f.seek(magic_off-4)
+                    elif magic_off == -1:
+                        break
+                s = None
                 
-            elif(size1 == 0x28):
-               magic = self.f.read(16)
-               if(magic == ("\x11\x11\x11\x11\x22\x22\x22\x22"
-                            +"\x33\x33\x33\x33\x44\x44\x44\x44")):
-                  ret_val = 'cursor'
-                
+                if magic_off == -1:
+                    sys.stderr.write("WARNING: Could not find cursor record.\n")
+                    self.f.seek(0x30)
+                else:
+                    self.cursor_offset = magic_off-4
+                    self.f.seek(self.cursor_offset)
+                    self.cursor = self.getCursorRecord()
+                    
             else:
-               magic = self.f.read(4)
-               if(magic == "\x4c\x66\x4c\x65"):
-                  ret_val = 'log'
-    
-      self.f.seek(cur_pos)
-      return ret_val
+                self.cursor_offset = self.header['next_off']
+                self.cursor = self.getCursorRecord()
+            
+            self.f.seek(self.cursor['first_off'])
 
 
-   def getHeaderRecord(self):
-      fmt = '<IIIIIIIIIIII'
-      fmt_len = struct.calcsize(fmt)
-      # XXX: check for read failure
-      raw_rec = self.f.read(fmt_len)
+    def tell(self):
+        return self.f.tell()
     
-      (size1,lfle,unknown1,unknown2,
-       first_off,next_off,next_num,first_num,
-       file_size,flags,retention,size2) = struct.unpack(fmt, raw_rec)
+    
+    def seek(self, off, whence=0):
+        self.f.seek(off, whence)
+    
+    
+    # XXX: is there a cleaner way to do this?
+    def size(self):
+        cur_pos = self.f.tell()
+        self.f.seek(0, 2)
+        ret_val = self.f.tell()
+        self.f.seek(cur_pos)
+
+        return ret_val
+
+
+    def guessRecordType(self):
+        if not self.f:
+            raise IOError, "Log file not open."
+        
+        cur_pos = self.f.tell()
+        ret_val = 'unknown'
+        
+        (size1,) = struct.unpack('<I', self.f.read(4))
+        if(size1 >= 28):
+            self.f.seek(size1-8,1)
+            (size2,) = struct.unpack('<I', self.f.read(4))
+            if(size2 == size1):
+                self.f.seek(4-size1,1)
+                if(size1 == 0x30):
+                    magic = self.f.read(4)
+                    if(magic == "\x4c\x66\x4c\x65"):
+                        ret_val = 'header'
+                
+                elif(size1 == 0x28):
+                    magic = self.f.read(16)
+                    if(magic == self.cursor_magic):
+                        ret_val = 'cursor'
+                        
+                else:
+                    magic = self.f.read(4)
+                    if(magic == "\x4c\x66\x4c\x65"):
+                        ret_val = 'log'
+    
+        self.f.seek(cur_pos)
+        return ret_val
+
+
+    # Parses a header record starting at the current log file offset
+    # Resulting file offset will be set to the next record on success,
+    # but is undefined if an exception is raised.
+    #
+    # Returns: a dictionary of header values
+    # Raises: IOError, EOFError
+    def getHeaderRecord(self):
+        fmt = '<IIIIIIIIIIII'
+        fmt_len = struct.calcsize(fmt)
+        raw_rec = self.f.read(fmt_len)
+        
+        if len(raw_rec) < fmt_len:
+            raise EOFError, "Record read is too short for format."
+
+        (size1,lfle,unknown1,unknown2,
+         first_off,next_off,next_num,first_num,
+         file_size,flags,retention,size2) = struct.unpack(fmt, raw_rec)
+
+        flag_dirty   =  flags & 0x1
+        flag_wrapped = (flags & 0x2) >> 1
+        flag_logfull = (flags & 0x4) >> 2
+        flag_primary = (flags & 0x8) >> 3
+        
+        ret_val = {'first_off':first_off, 'first_num':first_num,
+                   'next_off':next_off, 'next_num':next_num,
+                   'file_size':file_size, 'retention':retention,
+                   'flag_dirty':flag_dirty, 'flag_wrapped':flag_wrapped,
+                   'flag_logfull':flag_logfull, 'flag_primary':flag_primary}
+        return ret_val
+
+
+    # Parses a cursor record starting at the current log file offset
+    # Resulting file offset will be set to the next record on success,
+    # but is undefined if an exception is raised.
+    #
+    # Returns: a dictionary of cursor values
+    # Raises: IOError, EOFError
+    def getCursorRecord(self):
+        fmt = '<IIIIIIIIII'
+        fmt_len = struct.calcsize(fmt)
+        raw_rec = self.f.read(fmt_len)
+
+        if len(raw_rec) < fmt_len:
+            raise EOFError, "Record read is too short for format."
+        
+        (size1,magic1,magic2,magic3,magic4,
+         first_off,next_off,next_num,first_num,
+         size2) = struct.unpack(fmt, raw_rec)
+
+        ret_val = {'first_off':first_off, 'first_num':first_num,
+                   'next_off':next_off, 'next_num':next_num}
+        return ret_val
+
+
+    # Parses a log record starting at the current log file offset
+    # Resulting file offset will be set to the next record on success,
+    # but is undefined if an exception is raised.
+    #
+    # Returns: a dictionary of log record values
+    # Raises: IOError
+    def getLogRecord(self):
+        size_str = self.f.read(4)
+        if len(size_str) < 4:
+            raise EOFError, "Couldn't read record length"
+        (size,) = struct.unpack('<I', size_str)
+    
+        fixed_fmt = '<IIIIHHHHHHIIIIII'
+        fixed_fmt_len = struct.calcsize(fixed_fmt)
+
+        rec_str = self.f.read(size-4)
+        if len(rec_str) < fixed_fmt_len:
+            print "fixed_fmt_len,len(rec_str): %d, %d" % (fixed_fmt_len,len(rec_str))
+            raise EOFError, "Couldn't read fixed-length portion of record."
+        
+        variable_str_len = len(rec_str) - fixed_fmt_len
+        (lfle,msg_num,
+         date_created,date_written,
+         event_id,event_rva_offset,
+         event_type,strcount,
+         category,unknown,
+         closing_record_number,string_offset,
+         sid_len,sid_offset,
+         data_len,data_offset,
+         variable_str) = struct.unpack("%s%ds" % (fixed_fmt, variable_str_len),
+                                       rec_str)
+        # Grab template variables
+        strs = []
+        if string_offset > 0:
+            strs=rec_str[string_offset-4:data_offset-4].decode(
+                source_encoding,'replace').split(u'\x00')
+            
+        # Grab source and computer fields
+        vstr = variable_str.decode(source_encoding,
+                                   'replace').split(u'\x00', 2)
+        source = ''
+        if len(vstr) > 0:
+            source = vstr[0]
       
-      flag_dirty =   flags & 0x1
-      flag_wrapped = flags & 0x2
-      flag_logfull = flags & 0x4
-      flag_primary = flags & 0x8
-
-      ret_val = {'first_off':first_off, 'first_num':first_num,
-                 'next_off':next_off, 'next_num':next_num,
-                 'file_size':file_size, 'retention':retention,
-                 'flag_dirty':flag_dirty, 'flag_wrapped':flag_wrapped,
-                 'flag_logfull':flag_logfull, 'flag_primary':flag_primary}
-      return ret_val
-
-
-   def getCursorRecord(self):
-      fmt = '<IIIIIIIIII'
-      fmt_len = struct.calcsize(fmt)
-      # XXX: check for read failure
-      raw_rec = self.f.read(fmt_len)
-    
-      (size1,magic1,magic2,magic3,magic4,
-       first_off,next_off,next_num,first_num,
-       size2) = struct.unpack(fmt, raw_rec)
-
-      ret_val = {'first_off':first_off, 'first_num':first_num,
-                 'next_off':next_off, 'next_num':next_num}
-      return ret_val
-
-
-   def getLogRecord(self):
-      # XXX: check for read failure
-      size_str = self.f.read(4)
-      if len(size_str) < 4:
-         return None
-      (size,) = struct.unpack('<I', size_str)
-    
-      fixed_fmt = '<IIIIHHHHHHIIIIII'
-      fixed_fmt_len = struct.calcsize(fixed_fmt)
-
-      # XXX: check for read failure
-      rec_str = self.f.read(size-4)
-      if len(rec_str) < fixed_fmt_len:
-         return {'msg_num':-1,'event_type':'',
-                 'date_created':'','date_written':'',
-                 'source':os.path.basename(sys.argv[0]), 'category':'',
-                 'event_id':'-1', 'event_rva':'',
-                 'user':'', 'computer':'',
-                 'message':"There was an error processing this event."\
-                           + "Binary record is not long enough.",
-                 'strings':'',
-                 'data':''}
-    
-      variable_str_len = len(rec_str) - fixed_fmt_len
-      (lfle,msg_num,
-       date_created,date_written,
-       event_id,event_rva_offset,
-       event_type,strcount,
-       category,unknown,
-       closing_record_number,string_offset,
-       sid_len,sid_offset,
-       data_len,data_offset,
-       variable_str) = struct.unpack("%s%ds" % (fixed_fmt, variable_str_len),
-                                     rec_str)
-      # Grab template variables
-      strs = []
-      if string_offset > 0:
-         strs = rec_str[string_offset-4:data_offset-4].decode(source_encoding, 'replace').split(u'\x00')
+        computer = ''
+        if len(vstr) > 1:
+            computer = vstr[1]
+        vstr = None
       
-      # Grab source and computer fields
-      vstr = variable_str.decode(source_encoding,
-                                 'replace').split(u'\x00', 2)
-      source = ''
-      if len(vstr) > 0:
-         source = vstr[0]
-      
-      computer = ''
-      if len(vstr) > 1:
-         computer = vstr[1]
-      vstr = None
-      
-      # Grab SID
-      sid = 'N/A'
-      if sid_len > 0:
-         sid_str = rec_str[sid_offset-4:sid_offset+sid_len-4]
-         sid = binSIDtoASCII(sid_str)
+        # Grab SID
+        sid = 'N/A'
+        if sid_len > 0:
+            sid_str = rec_str[sid_offset-4:sid_offset+sid_len-4]
+            sid = binSIDtoASCII(sid_str)
 
-      # Grab binary data chunk
-      data = ''
-      if data_len > 0:
-         data = rec_str[data_offset-4:data_offset+data_len-4]
+        # Grab binary data chunk
+        data = ''
+        if data_len > 0:
+            data = rec_str[data_offset-4:data_offset+data_len-4]
     
-      # Retrieve and process message template
-      event_rva = "%.8X"%(long(event_rva_offset)<<16|event_id)
-      message_template = self.mr.getMessageTemplate(source, event_rva)
-      message = ''
-      if message_template:
-         message = formatMessage(message_template, strs)
-      else:
-         sys.stderr.write("WARNING: Missing message"\
-                          +" template for event record #%d.  (service: %s)\n"
-                          % (msg_num, source))
+        # Retrieve and process message template
+        event_rva = "%.8X"%(long(event_rva_offset)<<16|event_id)
+        message_template = self.mr.getMessageTemplate(source, event_rva)
+        message = ''
+        if message_template:
+            message = formatMessage(message_template, strs)
+        else:
+            sys.stderr.write("WARNING: Missing message"\
+                            +" template for event record #%d.  (service: %s)\n"
+                             % (msg_num, source))
 
-      event_type_str = eventTypeEnum.get(event_type, None)
-      if not event_type_str:
-         event_type_str = "Unknown(0x%.4X)" % event_type
+        event_type_str = eventTypeEnum.get(event_type, None)
+        if not event_type_str:
+            event_type_str = "Unknown(0x%.4X)" % event_type
 
-      # Format fields and return
-      return {'msg_num':msg_num,
-              'event_type':event_type_str,
-              'date_created':time.strftime("%Y-%m-%d %H:%M:%S",
-                                           time.gmtime(date_created)),
-              'date_written':time.strftime("%Y-%m-%d %H:%M:%S",
-                                           time.gmtime(date_written)),
-              'source':source, 'category':category,
-              'event_id':event_id, 'event_rva':"0x%s" % event_rva,
-              'user':sid, 'computer':computer,
-              'message':message,
-              'strings':'|'.join(strs).strip('|'),
-              'data':data}
+        # Format fields and return
+        return {'msg_num':msg_num,
+                'event_type':event_type_str,
+                'date_created':time.strftime("%Y-%m-%d %H:%M:%S",
+                                             time.gmtime(date_created)),
+                'date_written':time.strftime("%Y-%m-%d %H:%M:%S",
+                                             time.gmtime(date_written)),
+                'source':source, 'category':category,
+                'event_id':event_id, 'event_rva':"0x%s" % event_rva,
+                'user':sid, 'computer':computer,
+                'message':message,
+                'strings':'|'.join(strs).strip('|'),
+                'data':data}
 
 
 
