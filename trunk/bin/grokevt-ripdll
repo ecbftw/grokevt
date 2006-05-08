@@ -75,6 +75,7 @@ def find_message_off(f, num_entries, id):
         #      file.
         if lang_id == 0x0409:  # 0x04: SUBLANG_ENGLISH_CAN, 0x09: LANG_ENGLISH
             ret_val = lang_offset
+
     return ret_val
 
 
@@ -113,18 +114,18 @@ def dump_pe(f,startoff,exesize):
     # IMAGE_DATA_DIRECTORYs
     img_dir_entries=[]
     for i in range(0,16):
-	tmp=unpack("<2L",f)
+        tmp=unpack("<2L",f)
         img_dir_entries.append(tmp)
 
     # rva == relative virtual address
     # Parse section headers.  Find the '.rsrc' section, and ignore rest.
     for sno in range(numsects):
-	(raw_name,tmp,sect_rva,rawsize,sect_off,ptr_reloc,ptr_lno,
+        (raw_name,tmp,sect_rva,rawsize,sect_off,ptr_reloc,ptr_lno,
          num_reloc,num_lno,flags)=unpack("<8sLLLLLLHHL",f)
-	sect_name=""
-	for c in raw_name:
-	    if ord(c)>=32:
-		sect_name+=c
+        sect_name=""
+        for c in raw_name:
+            if ord(c)>=32:
+                sect_name+=c
 
         if sect_name == '.rsrc':
             f.seek(sect_off)
@@ -183,26 +184,26 @@ def dump_pe(f,startoff,exesize):
 def dump_exe(f):
     startoff=f.tell()
     try:
-	(MZ,size_l,size_h,relocs,hdrsize,allocmin,allocmax,
+        (MZ,size_l,size_h,relocs,hdrsize,allocmin,allocmax,
          SS,SP,CRC,CS,IP,relocoff,ovl) = unpack("<14H",f)
-	if not MZ in (0x5A4D,0x4D5A):
+        if not MZ in (0x5A4D,0x4D5A):
             sys.stderr.write("No M$ executable header found.\n")
-	    return None
+            return None
     except:
         sys.stderr.write("Error during header parse:\n%s: %s\n\n%s\n" % sys.exc_info())
         return None
     size=size_h*512
     if size_l:
-	size+=size_l-512
+        size+=size_l-512
 #    if relocoff>=0x40:
     try:
         # new-exe:
-	f.seek(startoff+0x3c)
-	ne_off,=unpack("<L",f)
-	f.seek(startoff+ne_off)
-	NE,=unpack("<H",f)
-	if NE==0x4550:
-	    return dump_pe(f,startoff,size)
+        f.seek(startoff+0x3c)
+        ne_off,=unpack("<L",f)
+        f.seek(startoff+ne_off)
+        NE,=unpack("<H",f)
+        if NE==0x4550:
+            return dump_pe(f,startoff,size)
         else:
             sys.stderr.write("Does not appear to be a PE formatted file.\n")
             return None
