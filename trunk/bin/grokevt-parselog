@@ -225,7 +225,17 @@ if evt_file.header['flag_dirty']:
 
 if evt_file.cursor == None:
     sys.stderr.write("WARNING: Naive parsing enabled.\n")
-    
+
+    # First, try to find the first log record via the magic number
+    # this will skip over any split log records at the beginning of the file
+    magic = ''
+    while (evt_file.tell() < evt_size) and (magic != evt_file.header_log_magic):
+        magic = evt_file.read(4)
+        evt_file.seek(-3, 1)
+
+    # Next walk through the file hoping to stay aligned with proper records
+    # We skip over anything that looks like a header or cursor, and bail out
+    # as soon as we run across a non-record.
     while evt_file.tell() < evt_size:
         record_type = evt_file.guessRecordType()
         if record_type == 'log':

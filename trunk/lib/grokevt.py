@@ -150,6 +150,8 @@ def formatMessage(fmt, vars):
     extended_fmt = ''
     for c in fmt:
         if state == 0:
+            arg_index = None
+            arg_num = ''
             if c == '%':
                 state=1
             else:
@@ -161,6 +163,9 @@ def formatMessage(fmt, vars):
                 elif c in ('%', ' ', '.', '!'):
                     ret_val += c
                     state = 0
+                elif c == 't':
+                    ret_val += '\x09'
+                    state = 0
                 elif c == 'n':
                     ret_val += '\x0a'
                     state = 0
@@ -168,7 +173,8 @@ def formatMessage(fmt, vars):
                 if ord(c) > 0x2f and ord(c) < 0x3a:
                     arg_index = int(arg_num + c) - 1
                 else:
-                    arg_index = int(arg_num) - 1
+                    if arg_index == None:
+                        arg_index = int(arg_num) - 1
                     
                     if c == '!':
                         state = 3
@@ -179,27 +185,27 @@ def formatMessage(fmt, vars):
                                 ret_val += "%s" % vars[arg_index]
                                 state = 1
                                 arg_num = ''
+                                arg_index = None
                             else:
                                 ret_val += "%s%s" % (vars[arg_index], c)
                                 state = 0
-                                arg_num = ''
                         else:
                             # arg_num not in vars
                             if c == '%':
                                 ret_val += "%%%s" % arg_num
-                                state = 2
+                                state = 1
                                 arg_num = ''
+                                arg_index = None
                             else:
                                 ret_val += "%%%s%s" % (arg_num, c)
                                 state = 0
-                                arg_num = ''
         elif state == 3:
             if c == '!':
                 state = 0
                 ret_val += wsprintf(extended_fmt, vars[arg_index])
             else:
                 extended_fmt += c
-                
+
     return ret_val
 
 
@@ -209,6 +215,7 @@ def formatMessage(fmt, vars):
 
 class evtFile:
     # useful constants
+    header_log_magic = "\x4c\x66\x4c\x65"
     cursor_magic = "\x11\x11\x11\x11\x22\x22\x22\x22"\
                  + "\x33\x33\x33\x33\x44\x44\x44\x44"
     header_size = 0x30
@@ -229,7 +236,7 @@ class evtFile:
     # Resulting offset:
     #    (error thrown)                      --> UNDEFINED
     #    (parse_meta == 0)                   --> 0
-    #    (parse_meta == 1 && missing cursor) --> 0x30
+    #    (parse_meta == 1 && missing cursor) --> self.header_size
     #    (parse_meta == 1 && found cursor)   --> self.cursor['first_off']
     #
     def __init__(self, filename, message_repository, parse_meta=1):
@@ -311,7 +318,7 @@ class evtFile:
     #
     # Returns: a string indicating record type.  Will be one of:
     #            'log','header','cursor','unknown'
-    # Raises: IOError, EOFError
+    # Raises: IOError
     def guessRecordType(self):
         if not self.f:
             raise IOError, "Log file not open."
@@ -320,26 +327,26 @@ class evtFile:
         ret_val = 'unknown'
         
         (size1,) = struct.unpack('<I', self.f.read(4))
-        if(size1 >= 28):
+        if(size1 >= self.cursor_size):
             self.f.seek(size1-8,1)
             (size2,) = struct.unpack('<I', self.f.read(4))
             if(size2 == size1):
                 self.f.seek(4-size1,1)
-                if(size1 == 0x30):
+                if(size1 == self.header_size):
                     magic = self.f.read(4)
-                    if(magic == "\x4c\x66\x4c\x65"):
+                    if(magic == self.header_log_magic):
                         ret_val = 'header'
                 
-                elif(size1 == 0x28):
+                elif(size1 == self.cursor_size):
                     magic = self.f.read(16)
                     if(magic == self.cursor_magic):
                         ret_val = 'cursor'
                         
                 else:
                     magic = self.f.read(4)
-                    if(magic == "\x4c\x66\x4c\x65"):
+                    if(magic == self.header_log_magic):
                         ret_val = 'log'
-    
+        
         self.f.seek(cur_pos)
         return ret_val
 
