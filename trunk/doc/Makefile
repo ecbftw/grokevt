@@ -1,7 +1,7 @@
 # $Id$
 
 sh-var-F=$F
-MAN_PAGES=1/grokevt-builddb.1 1/grokevt-parselog.1\
+MAN_PAGES=1/grokevt-addlog.1 1/grokevt-builddb.1 1/grokevt-parselog.1\
 	 1/grokevt-ripdll.1 7/grokevt.7
 
 build:

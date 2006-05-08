@@ -42,7 +42,7 @@ grokevt-ripdll
 
 
 =SEE ALSO=
-	grokevt-builddb(1) grokevt-parselog(1) grokevt(7)
+	grokevt-addlog(1) grokevt-builddb(1) grokevt-parselog(1) grokevt(7)
 
 
 =CREDITS=
@@ -52,7 +52,7 @@ grokevt-ripdll
 
 	Message resource parsing added by Timothy D. Morgan.
 
-	Copyright (C) 2005 Timothy D. Morgan
+	Copyright (C) 2005-2006 Timothy D. Morgan
 
 	Copyright (C) 2004 A'rpi
 

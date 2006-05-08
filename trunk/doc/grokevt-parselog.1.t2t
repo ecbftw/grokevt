@@ -103,7 +103,7 @@ grokevt-parselog
 
 
 =SEE ALSO=
-	grokevt-builddb(1) grokevt-ripdll(1) grokevt(7)
+	grokevt-addlog(1) grokevt-builddb(1) grokevt-ripdll(1) grokevt(7)
 
 
 =CREDITS=
@@ -114,7 +114,7 @@ grokevt-parselog
 	Andreas Schuster has contributed greatly to the understanding of
 	the event log format. 
 
-	Copyright (C) 2005 Timothy D. Morgan
+	Copyright (C) 2005-2006 Timothy D. Morgan
 
 	Copyright (C) 2004 Jamie French
 

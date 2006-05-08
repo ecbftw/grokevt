@@ -69,13 +69,14 @@ grokevt-builddb
 
 
 =SEE ALSO=
-	grokevt-parselog(1) grokevt-ripdll(1) reglookup(1) grokevt(7)
+	grokevt-addlog(1) grokevt-parselog(1) grokevt-ripdll(1) 
+	reglookup(1) grokevt(7)
 
 
 =CREDITS=
 	Written by Timothy D. Morgan
 
-	Copyright (C) 2005 Timothy D. Morgan
+	Copyright (C) 2005-2006 Timothy D. Morgan
 
 
 =LICENSE=
