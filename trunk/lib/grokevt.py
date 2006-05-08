@@ -274,7 +274,7 @@ class evtFile:
                 
                 if magic_off == -1:
                     sys.stderr.write("WARNING: Could not find cursor record.\n")
-                    self.f.seek(0x30)
+                    self.f.seek(self.header_size)
                 else:
                     self.cursor_offset = magic_off-4
                     self.f.seek(self.cursor_offset)
@@ -305,6 +305,13 @@ class evtFile:
         return ret_val
 
 
+    # Uses heuristics to determine the type of record at the current
+    # file offset.  Upon successful return, file offset remains the same.
+    # Opon throwing an exception, offset is unspecified.
+    #
+    # Returns: a string indicating record type.  Will be one of:
+    #            'log','header','cursor','unknown'
+    # Raises: IOError, EOFError
     def guessRecordType(self):
         if not self.f:
             raise IOError, "Log file not open."
@@ -339,7 +346,7 @@ class evtFile:
 
     # Parses a header record starting at the current log file offset
     # Resulting file offset will be set to the next record on success,
-    # but is undefined if an exception is raised.
+    # but is unspecified if an exception is raised.
     #
     # Returns: a dictionary of header values
     # Raises: IOError, EOFError
@@ -408,9 +415,17 @@ class evtFile:
 
         rec_str = self.f.read(size-4)
         if len(rec_str) < fixed_fmt_len:
-            print "fixed_fmt_len,len(rec_str): %d, %d" % (fixed_fmt_len,len(rec_str))
-            raise EOFError, "Couldn't read fixed-length portion of record."
-        
+            # If this occurs, the log file is WRAPPED and the entire next record
+            # should live right after the header.
+            self.f.seek(self.header_size)
+            rec_str = self.f.read(size-4)
+
+        elif len(rec_str) < (size-4):
+            # If this occurs, it's WRAPPED and this record was broken in two.
+            # Jump to beginning and read the rest of the record.
+            self.f.seek(self.header_size)
+            rec_str += self.f.read(size-4-len(rec_str))
+
         variable_str_len = len(rec_str) - fixed_fmt_len
         (lfle,msg_num,
          date_created,date_written,
@@ -422,6 +437,7 @@ class evtFile:
          data_len,data_offset,
          variable_str) = struct.unpack("%s%ds" % (fixed_fmt, variable_str_len),
                                        rec_str)
+
         # Grab template variables
         strs = []
         if string_offset > 0:

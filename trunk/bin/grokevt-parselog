@@ -256,7 +256,7 @@ if evt_file.cursor == None:
             break
         
 else:
-    while evt_file.tell() < evt_file.cursor['next_off']:
+    for i in xrange(evt_file.cursor['first_num'],evt_file.cursor['next_num']):
         #XXX: catch exceptions
         rec = evt_file.getLogRecord()
         for k in rec.keys():
