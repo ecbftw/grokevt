@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2005 Timothy D. Morgan
+# Copyright (C) 2005-2006 Timothy D. Morgan
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -36,7 +36,7 @@ eventTypeEnum = {0:'Success',
 		 16:'FailureAudit'}
 
 # XXX: this probably never changes, but might be interesting to see if
-#      it is big endian on NT Alpha systems.
+#      it is big endian on NT Alpha/MIPS systems.
 source_encoding = 'utf-16le'
 
 # This is what we store message in when ripped from DLLs
@@ -133,11 +133,11 @@ def wsprintf(fmt, vars):
     return (py_fmt % vars)
 
 
-# Reference:
+# References:
 #  http://msdn.microsoft.com/library/en-us/debug/base/formatmessage.asp
+#  http://msdn.microsoft.com/library/en-us/tools/tools/message_text_files.asp
 #  XXX: Does someone know of a better reference for this?  The author of
-#       that page couldn't write themselves out of a wet paper bag.  Way
-#       too much ambiguity.
+#       these pages couldn't write themselves out of a wet paper bag.
 def formatMessage(fmt, vars):
     # states:
     # 0: normal text
@@ -158,18 +158,34 @@ def formatMessage(fmt, vars):
                 ret_val += c
         elif state == 1:
             if len(arg_num) == 0:
-                if ord(c) > 0x2f and ord(c) < 0x3a:
+                # ASCII digits {1..9}
+                if ord(c) > 0x30 and ord(c) < 0x3a:
                     arg_num = c
-                elif c in ('%', ' ', '.', '!'):
-                    ret_val += c
+                # This probably isn't exactly correct, but it's better
+                # than cutting off the message early.
+                elif c == '0':
+                    ret_val += '\x00'
+                    state = 0
+                elif c == 'b':
+                    ret_val += ' '
                     state = 0
                 elif c == 't':
                     ret_val += '\x09'
                     state = 0
-                elif c == 'n':
+                elif c == 'r':
+                    ret_val += '\x0d'
+                    state = 0
+                elif c == '\\':
                     ret_val += '\x0a'
                     state = 0
+                elif c == 'n':
+                    ret_val += '\x0d\x0a'
+                    state = 0
+                else:
+                    ret_val += c
+                    state = 0
             elif len(arg_num) == 1:
+                # ASCII digits {0..9}
                 if ord(c) > 0x2f and ord(c) < 0x3a:
                     arg_index = int(arg_num + c) - 1
                 else:

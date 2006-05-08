@@ -21,11 +21,18 @@ Micro$oft's PE executable format:
 http://www.csn.ul.ie/~caolan/publink/winresdump/winresdump/doc/pefile.html
 http://www.wotsit.org/download.asp?f=pe
 
+Language Codes (exist in .rsrc sections of PE files):
+http://msdn.microsoft.com/library/en-us/intl/nls_238z.asp
+
 FormatMessage():
 http://msdn.microsoft.com/library/default.asp?url=/library/en-us/debug/base/formatmessage.asp
+http://msdn.microsoft.com/library/en-us/tools/tools/message_text_files.asp
 
 Converting binary SID's to text:
 http://blogs.msdn.com/oldnewthing/archive/2004/03/15/89753.aspx
 
 Event Types:
 http://technet2.microsoft.com/WindowsServer/en/Library/7e77c2f0-8835-4bea-b972-26edb2aceb3d1033.mspx
+
+System Error Codes:
+http://msdn.microsoft.com/library/en-us/debug/base/system_error_codes.asp

@@ -7,7 +7,7 @@
 # Original PE header code borrowed from the pymavis project.
 # For more information, see: http://www.mplayerhq.hu/~arpi/pymavis/
 #
-# Copyright (C) 2005 Timothy D. Morgan
+# Copyright (C) 2005-2006 Timothy D. Morgan
 # Copyright (C) 2004 A'rpi
 #
 # This program is free software; you can redistribute it and/or
@@ -20,6 +20,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
+# vi:set tabsize=4:
 # $Id$
 
 
@@ -69,9 +70,9 @@ def find_message_off(f, num_entries, id):
     ret_val = None
     for i in range(0, num_entries):
         (lang_id, lang_offset) = unpack("<II", f)
-        # XXX: Should probably be generalized to extract all languages
+        # XXX: This needs to be generalized to extract all languages
         #      in files and categorize them as such in the output DB
-        #      file.  
+        #      file.
         if lang_id == 0x0409:  # 0x04: SUBLANG_ENGLISH_CAN, 0x09: LANG_ENGLISH
             ret_val = lang_offset
     return ret_val
@@ -90,7 +91,7 @@ def read_message_string(f):
     # XXX: is this the best way to decode/encode unicode?
     return f.read(length-4).decode(source_encoding,
                                    'replace').encode(template_encoding)
-    #return f.read(length-4).replace('\x00', '')
+
 
 
 def dump_pe(f,startoff,exesize):

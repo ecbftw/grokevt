@@ -10,7 +10,7 @@
 # For the original PHP version, please see:
 #http://www.whitehats.ca/main/members/Malik/malik_eventlogs/malik_eventlogs.html
 # 
-# Copyright (C) 2005 Timothy D. Morgan
+# Copyright (C) 2005-2006 Timothy D. Morgan
 # Copyright (C) 2004 Jamie French
 #
 # This program is free software; you can redistribute it and/or
@@ -23,6 +23,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
+# vi:set tabsize=4:
 # $Id$
 
 
@@ -239,6 +240,7 @@ if evt_file.cursor == None:
     while evt_file.tell() < evt_size:
         record_type = evt_file.guessRecordType()
         if record_type == 'log':
+            # XXX: catch exceptions?
             rec = evt_file.getLogRecord()
             for k in rec.keys():
                 if type(rec[k]) == types.StringType:
@@ -267,7 +269,7 @@ if evt_file.cursor == None:
         
 else:
     for i in xrange(evt_file.cursor['first_num'],evt_file.cursor['next_num']):
-        #XXX: catch exceptions
+        # XXX: catch exceptions?
         rec = evt_file.getLogRecord()
         for k in rec.keys():
             if type(rec[k]) == types.StringType:
