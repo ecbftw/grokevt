@@ -403,7 +403,7 @@ class evtFile:
     # but is undefined if an exception is raised.
     #
     # Returns: a dictionary of log record values
-    # Raises: IOError
+    # Raises: IOError, ValueError
     def getLogRecord(self):
         size_str = self.f.read(4)
         if len(size_str) < 4:
@@ -412,6 +412,11 @@ class evtFile:
     
         fixed_fmt = '<IIIIHHHHHHIIIIII'
         fixed_fmt_len = struct.calcsize(fixed_fmt)
+
+        if size < fixed_fmt_len:
+            # XXX: use different exception class here
+            raise ValueError, ("Log size (%d) is too small.  Not a log record?"
+                               % size)
 
         rec_str = self.f.read(size-4)
         if len(rec_str) < fixed_fmt_len:
