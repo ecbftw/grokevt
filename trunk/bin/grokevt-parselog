@@ -179,11 +179,6 @@ try:
         sys.stderr.write("INFO: Opening event log file at '%s'.\n"
                          % evt_filename)
     evt_file = evtFile(evt_filename, msg_repo)
-
-except ValueError, inst:
-    sys.stderr.write("ERROR: %s\n" % inst)
-    sys.stderr.write("       Are you sure this is an event log?\n")
-    sys.exit(3)
 except Exception, inst:
     sys.stderr.write("%s\n" % inst)
     sys.stderr.write("ERROR: Could not open log file.\n")
@@ -195,27 +190,39 @@ evt_size = evt_file.size()
 # Begin parsing logic
 if mode_meta:
     csvwriter = csv.DictWriter(sys.stdout, meta_fields, '', 'ignore')
-    row = {'header_first_off':evt_file.header['first_off'],
+    row = {'header_first_off':"Unknown",
            'cursor_first_off':"Unknown",
-           'header_first_num':evt_file.header['first_num'],
+           'header_first_num':"Unknown",
            'cursor_first_num':"Unknown",
-           'header_next_off':evt_file.header['next_off'],
+           'header_next_off':"Unknown",
            'cursor_next_off':"Unknown",
-           'header_next_num':evt_file.header['next_num'],
+           'header_next_num':"Unknown",
            'cursor_next_num':"Unknown",
-           'header_file_size':evt_file.header['file_size'],
+           'header_file_size':"Unknown",
            'real_file_size':evt_size,
-           'retention_period':evt_file.header['retention'],
-           'flag_dirty':evt_file.header['flag_dirty'],
-           'flag_wrapped':evt_file.header['flag_wrapped'],
-           'flag_logfull':evt_file.header['flag_logfull'],
-           'flag_primary':evt_file.header['flag_primary']}
+           'retention_period':"Unknown",
+           'flag_dirty':"Unknown",
+           'flag_wrapped':"Unknown",
+           'flag_logfull':"Unknown",
+           'flag_primary':"Unknown"}
+    
+    if evt_file.header:
+        row['header_first_off'] = evt_file.header['first_off']
+        row['header_first_num'] = evt_file.header['first_num']
+        row['header_next_off']  = evt_file.header['next_off']
+        row['header_next_num']  = evt_file.header['next_num']
+        row['header_file_size'] = evt_file.header['file_size']
+        row['retention_period'] = evt_file.header['retention']
+        row['flag_dirty']       = evt_file.header['flag_dirty']
+        row['flag_wrapped']     = evt_file.header['flag_wrapped']
+        row['flag_logfull']     = evt_file.header['flag_logfull']
+        row['flag_primary']     = evt_file.header['flag_primary']
 
     if evt_file.cursor:        
-        row['cursor_first_off'] = evt_file.cursor['first_off'];
-        row['cursor_first_num'] = evt_file.cursor['first_num'];
-        row['cursor_next_off']  = evt_file.cursor['next_off'];
-        row['cursor_next_num']  = evt_file.cursor['next_num'];
+        row['cursor_first_off'] = evt_file.cursor['first_off']
+        row['cursor_first_num'] = evt_file.cursor['first_num']
+        row['cursor_next_off']  = evt_file.cursor['next_off']
+        row['cursor_next_num']  = evt_file.cursor['next_num']
 
     csvwriter.writerow(meta_header)
     csvwriter.writerow(row)
@@ -229,23 +236,29 @@ if print_header:
 if print_verbose:
     sys.stderr.write("INFO: Now parsing file.\n")
     
-if evt_file.header['flag_dirty']:
+if evt_file.header and evt_file.header['flag_dirty']:
     sys.stderr.write("WARNING: Log file marked as dirty.\n")
 
-if evt_file.cursor == None:
+if (evt_file.header == None) or (evt_file.cursor == None):
     sys.stderr.write("WARNING: Naive parsing enabled.\n")
 
-    # First, try to find the first log record. This will skip over any split
-    # log records at the beginning of the file.
-    while (evt_file.guessRecordType()!='log') and (evt_file.tell()<evt_size):
-        evt_file.seek(1,1)
-
-    # Next walk through the file hoping to stay aligned with proper records
-    # We skip over anything that looks like a header or cursor, and bail out
-    # as soon as we run across a non-record.
-    while evt_file.tell() < evt_size:
+    record_type = None
+    while record_type != 'wrapped-log':
+        # First, try to find the first log record. This will skip over any split
+        # log records at the beginning of the file.
         record_type = evt_file.guessRecordType()
-        if record_type == 'log':
+        while ((evt_file.guessRecordType()=='unknown')
+               and (evt_file.tell()<evt_size)):
+            evt_file.seek(1,1)
+            record_type = evt_file.guessRecordType()
+
+        if evt_file.tell() >= evt_size:
+            break
+
+        # Next walk through the file hoping to stay aligned with proper records
+        # We skip over anything that looks like a header or cursor, and bail out
+        # as soon as we run across a non-record.
+        if record_type in ('log', 'wrapped-log'):
             # XXX: catch exceptions?
             rec = evt_file.getLogRecord()
             for k in rec.keys():
@@ -260,18 +273,14 @@ if evt_file.cursor == None:
             csvwriter.writerow(rec)
 
         elif record_type == 'cursor':
-            sys.stderr.write("WARNING: Skipping potential cursor record.\n")
+            sys.stderr.write("WARNING: Skipping potential cursor record "
+                            +"at offset %d.\n" % evt_file.tell())
             evt_file.seek(evt_file.tell()+evt_file.cursor_size)
             
         elif record_type == 'header':
-            sys.stderr.write("WARNING: Skipping potential header record.\n")
+            sys.stderr.write("WARNING: Skipping potential header record "
+                             +"at offset %d.\n" % evt_file.tell())
             evt_file.seek(evt_file.tell()+evt_file.header_size)
-            
-        elif record_type == 'unknown':
-            sys.stderr.write("ERROR: Reached unknown record type.\n")
-            sys.stderr.write("ERROR: Stopped parsing at offset: %d\n"
-                             % evt_file.tell())
-            break
         
 else:
     for i in xrange(evt_file.cursor['first_num'],evt_file.cursor['next_num']):

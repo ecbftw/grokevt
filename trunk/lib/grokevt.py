@@ -249,21 +249,27 @@ class evtFile:
     # Opens a log file and an associated message repository.
     # Optionally parses the .evt file's meta records (header and cursor).
     # 
-    # Raises: IOError, EOFError
+    # Raises: IOError
     # Resulting offset:
     #    (error thrown)                      --> UNDEFINED
     #    (parse_meta == 0)                   --> 0
+    #    (parse_meta == 1 && missing header) --> 0
     #    (parse_meta == 1 && missing cursor) --> self.header_size
     #    (parse_meta == 1 && found cursor)   --> self.cursor['first_off']
     #
     def __init__(self, filename, message_repository, parse_meta=1):
-        self.f = file(filename, "r")
+        self.f = file(filename, "rb")
         self.mr = message_repository
+        
         if parse_meta:
             # First parse header
             if(self.guessRecordType() != 'header'):
-                # XXX: use different exception class here
-                raise ValueError, "File header is not an event log header."
+                # XXX: should we search the file for a header and cursor
+                #      anyway?  How would we trust offsets?
+                sys.stderr.write("WARNING: Could not find header record.\n")
+                self.f.seek(0)
+                return
+
             self.header = self.getHeaderRecord()
 
             # Next, try to find the cursor
@@ -318,8 +324,8 @@ class evtFile:
         self.f.seek(off, whence)
     
     
-    # XXX: is there a cleaner way to do this?
     def size(self):
+        # XXX: is there a cleaner way to do this?
         cur_pos = self.f.tell()
         self.f.seek(0, 2)
         ret_val = self.f.tell()
@@ -333,7 +339,7 @@ class evtFile:
     # Opon throwing an exception, offset is unspecified.
     #
     # Returns: a string indicating record type.  Will be one of:
-    #            'log','header','cursor','unknown'
+    #            'log','wrapped-log','header','cursor','unknown'
     # Raises: IOError
     def guessRecordType(self):
         if not self.f:
@@ -344,50 +350,56 @@ class evtFile:
 
         raw_str = self.f.read(4)
         if len(raw_str) != 4:
+            self.f.seek(cur_pos)
             return ret_val
         (size1,) = struct.unpack('<I', raw_str)
-        
+
+        # XXX: some of these should be more strict
         if (size1 == self.header_size):
             self.f.seek(cur_pos+size1-4)
             raw_str = self.f.read(4)
-            if len(raw_str) != 4:
-                return ret_val
-            (size2,) = struct.unpack('<I', raw_str)                
-            if(size2 == size1):
-                self.f.seek(cur_pos+4)
-                magic = self.f.read(len(self.header_log_magic))
-                if(magic == self.header_log_magic):
-                    ret_val = 'header'
+            if len(raw_str) == 4:
+                (size2,) = struct.unpack('<I', raw_str)                
+                if(size2 == size1):
+                    self.f.seek(cur_pos+4)
+                    magic = self.f.read(len(self.header_log_magic))
+                    if(magic == self.header_log_magic):
+                        ret_val = 'header'
                 
-        elif(size1 == self.cursor_size):
+        elif (size1 == self.cursor_size):
             self.f.seek(cur_pos+size1-4)
             raw_str = self.f.read(4)
-            if len(raw_str) != 4:
-                return ret_val
-            (size2,) = struct.unpack('<I', raw_str)                
-            if(size2 == size1):
-                self.f.seek(cur_pos+4)
-                magic = self.f.read(len(self.cursor_magic))
-                if(magic == self.cursor_magic):
-                    ret_val = 'cursor'
+            if len(raw_str) == 4:
+                (size2,) = struct.unpack('<I', raw_str)                
+                if(size2 == size1):
+                    self.f.seek(cur_pos+4)
+                    magic = self.f.read(len(self.cursor_magic))
+                    if(magic == self.cursor_magic):
+                        ret_val = 'cursor'
                     
-        elif(size1 > self.log_fixed_size):
-            fsize = self.size()
-            if fsize < cur_pos+size1:
-                # check if this record is wrapped
-                self.f.seek(self.header_size+(cur_pos+size1-fsize-4))
-            else:
-                self.f.seek(cur_pos+size1-4)
+        elif (size1 > self.log_fixed_size) and (self.size() < cur_pos+size1):
+            self.f.seek(self.header_size+(cur_pos+size1-self.size()-4))
 
             raw_str = self.f.read(4)
-            if len(raw_str) != 4:
-                return ret_val
-            (size2,) = struct.unpack('<I', raw_str)
-            if(size2 == size1):
-                self.f.seek(cur_pos+4)
-                magic = self.f.read(len(self.header_log_magic))
-                if(magic == self.header_log_magic):
-                    ret_val = 'log'
+            if len(raw_str) == 4:
+                (size2,) = struct.unpack('<I', raw_str)
+                if(size2 == size1):
+                    self.f.seek(cur_pos+4)
+                    magic = self.f.read(len(self.header_log_magic))
+                    if(magic == self.header_log_magic):
+                        ret_val = 'wrapped-log'
+
+        elif (size1 > self.log_fixed_size):
+            self.f.seek(cur_pos+size1-4)
+
+            raw_str = self.f.read(4)
+            if len(raw_str) == 4:
+                (size2,) = struct.unpack('<I', raw_str)
+                if(size2 == size1):
+                    self.f.seek(cur_pos+4)
+                    magic = self.f.read(len(self.header_log_magic))
+                    if(magic == self.header_log_magic):
+                        ret_val = 'log'
         
         self.f.seek(cur_pos)
         return ret_val
