@@ -196,13 +196,13 @@ evt_size = evt_file.size()
 if mode_meta:
     csvwriter = csv.DictWriter(sys.stdout, meta_fields, '', 'ignore')
     row = {'header_first_off':evt_file.header['first_off'],
-           'cursor_first_off':evt_file.cursor['first_off'],
+           'cursor_first_off':"Unknown",
            'header_first_num':evt_file.header['first_num'],
-           'cursor_first_num':evt_file.cursor['first_num'],
+           'cursor_first_num':"Unknown",
            'header_next_off':evt_file.header['next_off'],
-           'cursor_next_off':evt_file.cursor['next_off'],
+           'cursor_next_off':"Unknown",
            'header_next_num':evt_file.header['next_num'],
-           'cursor_next_num':evt_file.cursor['next_num'],
+           'cursor_next_num':"Unknown",
            'header_file_size':evt_file.header['file_size'],
            'real_file_size':evt_size,
            'retention_period':evt_file.header['retention'],
@@ -210,9 +210,17 @@ if mode_meta:
            'flag_wrapped':evt_file.header['flag_wrapped'],
            'flag_logfull':evt_file.header['flag_logfull'],
            'flag_primary':evt_file.header['flag_primary']}
+
+    if evt_file.cursor:        
+        row['cursor_first_off'] = evt_file.cursor['first_off'];
+        row['cursor_first_num'] = evt_file.cursor['first_num'];
+        row['cursor_next_off']  = evt_file.cursor['next_off'];
+        row['cursor_next_num']  = evt_file.cursor['next_num'];
+
     csvwriter.writerow(meta_header)
     csvwriter.writerow(row)
     sys.exit(0)
+
 
 csvwriter = csv.DictWriter(sys.stdout, log_fields, '', 'ignore')
 if print_header:
@@ -227,12 +235,10 @@ if evt_file.header['flag_dirty']:
 if evt_file.cursor == None:
     sys.stderr.write("WARNING: Naive parsing enabled.\n")
 
-    # First, try to find the first log record via the magic number
-    # this will skip over any split log records at the beginning of the file
-    magic = ''
-    while (evt_file.tell() < evt_size) and (magic != evt_file.header_log_magic):
-        magic = evt_file.read(4)
-        evt_file.seek(-3, 1)
+    # First, try to find the first log record. This will skip over any split
+    # log records at the beginning of the file.
+    while (evt_file.guessRecordType()!='log') and (evt_file.tell()<evt_size):
+        evt_file.seek(1,1)
 
     # Next walk through the file hoping to stay aligned with proper records
     # We skip over anything that looks like a header or cursor, and bail out
@@ -262,7 +268,7 @@ if evt_file.cursor == None:
             evt_file.seek(evt_file.tell()+evt_file.header_size)
             
         elif record_type == 'unknown':
-            sys.stderr.write("ERROR: Reached unknown record type.")
+            sys.stderr.write("ERROR: Reached unknown record type.\n")
             sys.stderr.write("ERROR: Stopped parsing at offset: %d\n"
                              % evt_file.tell())
             break

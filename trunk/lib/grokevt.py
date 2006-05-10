@@ -236,6 +236,7 @@ class evtFile:
                  + "\x33\x33\x33\x33\x44\x44\x44\x44"
     header_size = 0x30
     cursor_size = 0x28
+    log_fixed_size = 0x38
     
     # instance state
     f = None
@@ -287,12 +288,10 @@ class evtFile:
                 magic_off = s.rfind(self.cursor_magic)
                 if magic_off > 3:
                     self.f.seek(magic_off-4)
-                while (self.guessRecordType() != 'cursor'):
+                while (self.guessRecordType()!= 'cursor') and (magic_off != -1):
                     magic_off = s.rfind(self.cursor_magic, magic_off-1)
                     if magic_off > 3:
                         self.f.seek(magic_off-4)
-                    elif magic_off == -1:
-                        break
                 s = None
                 
                 if magic_off == -1:
@@ -302,12 +301,13 @@ class evtFile:
                     self.cursor_offset = magic_off-4
                     self.f.seek(self.cursor_offset)
                     self.cursor = self.getCursorRecord()
+                    self.f.seek(self.cursor['first_off'])
                     
             else:
                 self.cursor_offset = self.header['next_off']
                 self.cursor = self.getCursorRecord()
-            
-            self.f.seek(self.cursor['first_off'])
+                self.f.seek(self.cursor['first_off'])
+    
 
 
     def tell(self):
@@ -338,30 +338,56 @@ class evtFile:
     def guessRecordType(self):
         if not self.f:
             raise IOError, "Log file not open."
-        
+
+        ret_val = 'unknown'        
         cur_pos = self.f.tell()
-        ret_val = 'unknown'
+
+        raw_str = self.f.read(4)
+        if len(raw_str) != 4:
+            return ret_val
+        (size1,) = struct.unpack('<I', raw_str)
         
-        (size1,) = struct.unpack('<I', self.f.read(4))
-        if(size1 >= self.cursor_size):
-            self.f.seek(size1-8,1)
-            (size2,) = struct.unpack('<I', self.f.read(4))
+        if (size1 == self.header_size):
+            self.f.seek(cur_pos+size1-4)
+            raw_str = self.f.read(4)
+            if len(raw_str) != 4:
+                return ret_val
+            (size2,) = struct.unpack('<I', raw_str)                
             if(size2 == size1):
-                self.f.seek(4-size1,1)
-                if(size1 == self.header_size):
-                    magic = self.f.read(4)
-                    if(magic == self.header_log_magic):
-                        ret_val = 'header'
+                self.f.seek(cur_pos+4)
+                magic = self.f.read(len(self.header_log_magic))
+                if(magic == self.header_log_magic):
+                    ret_val = 'header'
                 
-                elif(size1 == self.cursor_size):
-                    magic = self.f.read(16)
-                    if(magic == self.cursor_magic):
-                        ret_val = 'cursor'
-                        
-                else:
-                    magic = self.f.read(4)
-                    if(magic == self.header_log_magic):
-                        ret_val = 'log'
+        elif(size1 == self.cursor_size):
+            self.f.seek(cur_pos+size1-4)
+            raw_str = self.f.read(4)
+            if len(raw_str) != 4:
+                return ret_val
+            (size2,) = struct.unpack('<I', raw_str)                
+            if(size2 == size1):
+                self.f.seek(cur_pos+4)
+                magic = self.f.read(len(self.cursor_magic))
+                if(magic == self.cursor_magic):
+                    ret_val = 'cursor'
+                    
+        elif(size1 > self.log_fixed_size):
+            fsize = self.size()
+            if fsize < cur_pos+size1:
+                # check if this record is wrapped
+                self.f.seek(self.header_size+(cur_pos+size1-fsize-4))
+            else:
+                self.f.seek(cur_pos+size1-4)
+
+            raw_str = self.f.read(4)
+            if len(raw_str) != 4:
+                return ret_val
+            (size2,) = struct.unpack('<I', raw_str)
+            if(size2 == size1):
+                self.f.seek(cur_pos+4)
+                magic = self.f.read(len(self.header_log_magic))
+                if(magic == self.header_log_magic):
+                    ret_val = 'log'
         
         self.f.seek(cur_pos)
         return ret_val
@@ -434,8 +460,8 @@ class evtFile:
         (size,) = struct.unpack('<I', size_str)
     
         fixed_fmt = '<IIIIHHHHHHIIIIII'
-        fixed_fmt_len = struct.calcsize(fixed_fmt)
-
+        fixed_fmt_len = self.log_fixed_size - 4
+        
         if size < fixed_fmt_len:
             # XXX: use different exception class here
             raise ValueError, ("Log size (%d) is too small.  Not a log record?"
@@ -496,7 +522,7 @@ class evtFile:
             data = rec_str[data_offset-4:data_offset+data_len-4]
     
         # Retrieve and process message template
-        event_rva = "%.8X"%(long(event_rva_offset)<<16|event_id)
+        event_rva = (long(event_rva_offset) << 16) | event_id
         message_template = self.mr.getMessageTemplate(source, event_rva)
         message = ''
         if message_template:
@@ -531,9 +557,25 @@ class evtFile:
 # Message database wrapper
 
 class messageRepository:
+    # XXX: Should this be made configurable, or do event logs implicitly
+    #      hard-code the language used at the time of writing a record via the
+    #      message ID (RVA)?  In other words, does the same message in multiple
+    #      languages use the same RVA, just different language tables, or are
+    #      the RVAs different for each language (in addition to being in a
+    #      different table)?  Should we base this on the default language
+    #      obtained from the registry?
+    
+    # XXX: The order is basically an arbitrary guess of the likelyhood of
+    #      finding logs in each of these languages.  A better way of deciding
+    #      this is needed.
+    # Codes for (en-US, de-DE, fr-FR, es-ES, Language Neutral)
+    # See: http://msdn.microsoft.com/library/en-us/intl/nls_238z.asp
+    languages = ("0409","0407", "040C", "0C0A", "0000")
     svc_dbs = {}
     msg_dbs = {}
+    
     def __init__(self, topdir, log):
+        # XXX: should these be opened on-demand and cached for repeated use?
         msg_dir = "%s/messages" % topdir
         dbs = os.listdir(msg_dir)
         for db in dbs:
@@ -544,24 +586,27 @@ class messageRepository:
         for t in ("category", "event", "parameter"):
             db_file = "%s/%s/%s.db" % (log_dir, log, t)
             self.svc_dbs[t] = anydbm.open(db_file, "r")
-   
-         
-    def getMessageTemplate(self, service, rva):
-        ret_val = None
-        mdbs = self.svc_dbs["event"].get(service.lower().encode('ascii'), None)
-        if mdbs:
-            for mdb in mdbs.split(':'):
-                ret_val = self.msg_dbs[mdb].get(rva, None)
-                if ret_val:
-                    # Templates shouldn't have any encoding issues.
-                    # If they do, we want to know about them, since this
-                    # means there's a bug in builddb.
-                    ret_val = ret_val.decode(template_encoding)
-                    break
+
+
+    def getMessageTemplate(self, service, rva, lang_code=None):
+        if lang_code:
+            langs = (lang_code,)
+        else:
+            langs = self.languages
         
-        return ret_val
-
-
+        for lang in langs:
+            mdbs = self.svc_dbs["event"].get(service.lower().encode('ascii'),
+                                             None)
+            if mdbs:
+                for mdb in mdbs.split(':'):
+                    ret_val = self.msg_dbs[mdb].get("%s-%.8X"%(lang, rva), None)
+                    if ret_val:
+                        # Templates shouldn't have any encoding issues.
+                        # If they do, we want to know about them, since this
+                        # means there's a bug in builddb.
+                        return ret_val.decode(template_encoding)
+        return None
+        
 
 ################################################################################
 # Configuration wrapper

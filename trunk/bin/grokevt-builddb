@@ -26,6 +26,7 @@ import anydbm
 import grokevt
 
 # XXX: should these be changed to absolute paths discovered at install time?
+CURRENT_DB_VERSION=2
 PATH_REGLOOKUP='reglookup'
 PATH_RIPDLL='grokevt-ripdll'
 
@@ -126,6 +127,11 @@ def makeOutputDirectories(topdir, logs):
                 sys.exit(os.EX_CANTCREAT)
         else:
             os.makedirs(p, 0755)
+    
+    # Write DB version
+    vf = file('%s/version' % topdir, 'w+')
+    vf.write('%d\n' % CURRENT_DB_VERSION)
+    vf.close()
 
 
 def writeServiceMapping(topdir, maps):

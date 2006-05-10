@@ -13,6 +13,9 @@ The info by Jamie French (aka Malik) which inspired the creation of
 GrokEVT:
 http://www.whitehats.ca/main/members/Malik/malik_eventlogs/malik_eventlogs.html
 
+Helpful chapter from "Windows NT Event Logging" (O'Reilly):
+  http://www.oreilly.com/catalog/winlog/chapter/ch02.html#40421
+
 
 Other References
 ================

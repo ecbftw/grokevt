@@ -33,6 +33,11 @@ import anydbm
 from grokevt import *
 
 
+# XXX: this whole script needs sanity checks on all data read, and on
+#      length of data read.  It may also be best to switch to using mmap
+#      instead of using so many seeks.
+
+
 def usage():
     sys.stderr.write("USAGE:\n")
     sys.stderr.write("  %s <INPUT_DLL> <OUTPUT_DB>\n\n"
@@ -66,15 +71,10 @@ def find_language_dir(f,num_dir_names,num_dir_ids):
     return ret_val 
 
 
-def find_message_off(f, num_entries, id):
-    ret_val = None
+def find_message_offsets(f, num_entries, id):
+    ret_val = []
     for i in range(0, num_entries):
-        (lang_id, lang_offset) = unpack("<II", f)
-        # XXX: This needs to be generalized to extract all languages
-        #      in files and categorize them as such in the output DB
-        #      file.
-        if lang_id == 0x0409:  # 0x04: SUBLANG_ENGLISH_CAN, 0x09: LANG_ENGLISH
-            ret_val = lang_offset
+        ret_val.append(unpack("<II", f))
 
     return ret_val
 
@@ -150,27 +150,30 @@ def dump_pe(f,startoff,exesize):
 
             (rsrc_flags,date,majver,minver,
              num_dir_names,num_dir_ids) = unpack("<IIHHHH", f)
-            msg_tbl_ptr = find_message_off(f, num_dir_ids, 0)
-            f.seek(sect_off+msg_tbl_ptr)
+            msg_tables = find_message_offsets(f, num_dir_ids, 0)
 
-            (msg_tbl_rva,
-             msg_tbl_len,
-             msg_tbl_off) = get_msg_tbl_params(f, sect_rva, sect_off)
-            f.seek(msg_tbl_off)
+            # Iterate through each available language
+            for (lang_id,lang_tbl_ptr) in msg_tables:
+                f.seek(sect_off+lang_tbl_ptr)
 
-            (msg_tbl_num_chunks,) = unpack("<I", f)
-            msg_tbl_chunks = []
-            for r in range(0,msg_tbl_num_chunks):
-                (va_from, va_to, msg_roff) = unpack("<III", f)
-                msg_tbl_chunks.append((va_from,va_to,msg_roff+msg_tbl_off))
-
-            messages = {}
-            for c in msg_tbl_chunks:
-                f.seek(c[2])
-                # Address ranges are inclusive
-                for message_id in range(c[0],c[1]+1):
-                    messages[message_id] = read_message_string(f)
-                    #print "%.8X=>%s" % (message_id, messages[message_id])
+                (msg_tbl_rva,
+                 msg_tbl_len,
+                 msg_tbl_off) = get_msg_tbl_params(f, sect_rva, sect_off)
+                f.seek(msg_tbl_off)
+                
+                (msg_tbl_num_chunks,) = unpack("<I", f)
+                msg_tbl_chunks = []
+                for r in range(0,msg_tbl_num_chunks):
+                    (va_from, va_to, msg_roff) = unpack("<III", f)
+                    msg_tbl_chunks.append((va_from,va_to,msg_roff+msg_tbl_off))
+                    
+                messages = {}
+                for c in msg_tbl_chunks:
+                    f.seek(c[2])
+                    # Address ranges are inclusive
+                    for message_id in range(c[0],c[1]+1):
+                        key = "%.4X-%.8X" % (lang_id, message_id)
+                        messages[key] = read_message_string(f)
 
             break;
 
@@ -224,7 +227,7 @@ messages = dump_exe(file(sys.argv[1], 'r'))
 if messages != None:
     db = anydbm.open(db_file, "n", 0644)
     for msg in messages.items():
-        db["%.8X"%msg[0]] = msg[1]
+        db[msg[0]] = msg[1]
     db.sync()
     db.close()
 
