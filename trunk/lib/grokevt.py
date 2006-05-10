@@ -232,6 +232,7 @@ def formatMessage(fmt, vars):
 class evtFile:
     # useful constants
     header_log_magic = "\x4c\x66\x4c\x65"
+    header_version = "\x01\x00\x00\x00\x01\x00\x00\x00"
     cursor_magic = "\x11\x11\x11\x11\x22\x22\x22\x22"\
                  + "\x33\x33\x33\x33\x44\x44\x44\x44"
     header_size = 0x30
@@ -362,10 +363,11 @@ class evtFile:
                 (size2,) = struct.unpack('<I', raw_str)                
                 if(size2 == size1):
                     self.f.seek(cur_pos+4)
-                    magic = self.f.read(len(self.header_log_magic))
-                    if(magic == self.header_log_magic):
+                    magic = self.f.read(len(self.header_log_magic
+                                            +self.header_version))
+                    if magic == (self.header_log_magic+self.header_version):
                         ret_val = 'header'
-                
+        
         elif (size1 == self.cursor_size):
             self.f.seek(cur_pos+size1-4)
             raw_str = self.f.read(4)
@@ -377,7 +379,9 @@ class evtFile:
                     if(magic == self.cursor_magic):
                         ret_val = 'cursor'
                     
-        elif (size1 > self.log_fixed_size) and (self.size() < cur_pos+size1):
+        elif ((size1 > self.log_fixed_size)
+              and (self.size() < cur_pos+size1)
+              and (self.size() >= cur_pos+self.log_fixed_size)):
             self.f.seek(self.header_size+(cur_pos+size1-self.size()-4))
 
             raw_str = self.f.read(4)
