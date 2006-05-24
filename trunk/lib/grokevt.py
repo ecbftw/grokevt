@@ -355,7 +355,7 @@ class evtFile:
             return ret_val
         (size1,) = struct.unpack('<I', raw_str)
 
-        # XXX: some of these should be more strict
+        # XXX: Can some of these should be more strict?
         if (size1 == self.header_size):
             self.f.seek(cur_pos+size1-4)
             raw_str = self.f.read(4)

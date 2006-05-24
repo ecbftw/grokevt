@@ -216,8 +216,12 @@ if not CONTROL_SET_ID:
     logs_query=["-t", "DWORD", "-p", CONTROL_SET_ID_PATH, config.registry_path]
     fromchild = runRegLookupQuery(logs_query)
     
-    # XXX: what if no line is returned?
     l = fromchild.readline()
+    if len(l) == 0:
+        sys.stderr.write("ERROR: Could not automatically "
+                         +"determine CONTROL_SET_ID\n")
+        sys.exit(os.EX_IOERR)
+
     CONTROL_SET_ID = int(l.split(',')[2], 16)
 
 
