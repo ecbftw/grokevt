@@ -65,6 +65,8 @@ def windowsPathToUnixPath(path_list, variables, drives):
     paths = ret_val.split(';')
     ret_val = []
     for p in paths:
+        # Some paths have been found with trailing nulls and garbage.
+        p = p.split('\x00')[0]
         for s in drives.items():
             if p.startswith(s[0].lower()):
                 p = p.replace(s[0].lower(), s[1], 1)
@@ -93,6 +95,7 @@ def buildShortNamesPathsDicts(paths):
     ret_val1 = {}
     ret_val2 = {}
     for p in paths.keys():
+        print grokevt.quoteString(p)
         if os.path.isfile(p):
             sn = os.path.basename(p).replace(':','_')
             ext = '.db'
