@@ -275,12 +275,12 @@ if (evt_file.header == None) or (evt_file.cursor == None):
         elif record_type == 'cursor':
             sys.stderr.write("WARNING: Skipping potential cursor record "
                             +"at offset %d.\n" % evt_file.tell())
-            evt_file.seek(evt_file.tell()+evt_file.cursor_size)
+            evt_file.seek(evt_file.tell()+cursor_size)
             
         elif record_type == 'header':
             sys.stderr.write("WARNING: Skipping potential header record "
                              +"at offset %d.\n" % evt_file.tell())
-            evt_file.seek(evt_file.tell()+evt_file.header_size)
+            evt_file.seek(evt_file.tell()+header_size)
         
 else:
     for i in xrange(evt_file.cursor['first_num'],evt_file.cursor['next_num']):

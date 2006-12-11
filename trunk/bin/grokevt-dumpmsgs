@@ -27,12 +27,14 @@ import grokevt
 
 def usage():
     sys.stderr.write("USAGE:\n")
-    sys.stderr.write("  %s <MESSAGE_DB_FILE>\n\n" % os.path.basename(sys.argv[0]))
+    sys.stderr.write("  %s <MESSAGE_DB1> [<MESSAGE_DB2> ...]\n\n"\
+                     % os.path.basename(sys.argv[0]))
     sys.stderr.write("grokevt-dumpmsgs dumps the contents of message databases\n")
     sys.stderr.write("built previously by grokevt-ripdll.\n")
 
 
 if len(sys.argv) < 1:
+    usage()
     sys.exit(os.EX_USAGE)
 
 for dbfile in sys.argv[1:]:

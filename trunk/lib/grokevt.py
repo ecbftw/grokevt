@@ -46,6 +46,17 @@ template_encoding = 'utf-8'
 output_encoding = 'utf-8'
 
 
+# Log format constants
+header_log_magic = "\x4c\x66\x4c\x65"
+header_version = "\x01\x00\x00\x00\x01\x00\x00\x00"
+cursor_magic ="\x11\x11\x11\x11\x22\x22\x22\x22\x33\x33\x33\x33\x44\x44\x44\x44"
+
+header_size = 0x30
+cursor_size = 0x28
+log_fixed_size = 0x38
+min_record_size = min(header_size, cursor_size, log_fixed_size)    
+
+
 ################################################################################
 # String Formatting Functions
 
@@ -225,20 +236,34 @@ def formatMessage(fmt, vars):
     return ret_val
 
 
+def guessRecordType(record, wrapped=False):
+    ret_val = 'unknown'
+    # XXX: Can some of these be more strict?
+    if (len(record) == header_size):
+        magic = record[4:4+len(header_log_magic+header_version)]
+        if magic == (header_log_magic+header_version):
+            ret_val = 'header'
+        
+    elif (len(record) == cursor_size):
+        magic = record[4:4+len(cursor_magic)]
+        if(magic == cursor_magic):
+            ret_val = 'cursor'
+        
+    elif (len(record) > log_fixed_size):
+        magic = record[4:4+len(header_log_magic)]
+        if(magic == header_log_magic):
+            if wrapped:
+                ret_val = 'wrapped-log'
+            else:
+                ret_val = 'log'
+    
+    return ret_val
+
 
 ################################################################################
 # .evt log files
 
 class evtFile:
-    # useful constants
-    header_log_magic = "\x4c\x66\x4c\x65"
-    header_version = "\x01\x00\x00\x00\x01\x00\x00\x00"
-    cursor_magic = "\x11\x11\x11\x11\x22\x22\x22\x22"\
-                 + "\x33\x33\x33\x33\x44\x44\x44\x44"
-    header_size = 0x30
-    cursor_size = 0x28
-    log_fixed_size = 0x38
-    
     # instance state
     f = None
     header = None
@@ -255,7 +280,7 @@ class evtFile:
     #    (error thrown)                      --> UNDEFINED
     #    (parse_meta == 0)                   --> 0
     #    (parse_meta == 1 && missing header) --> 0
-    #    (parse_meta == 1 && missing cursor) --> self.header_size
+    #    (parse_meta == 1 && missing cursor) --> header_size
     #    (parse_meta == 1 && found cursor)   --> self.cursor['first_off']
     #
     def __init__(self, filename, message_repository, parse_meta=1):
@@ -287,23 +312,23 @@ class evtFile:
                 s = self.f.read()
                 self.f.seek(0)
 
-                if s.count(self.cursor_magic) > 1:
+                if s.count(cursor_magic) > 1:
                     sys.stderr.write("WARNING: Multiple cursors may exist."\
                                     +"  Attempting to use last one in file.\n")
 
                 # Search for the cursor magic and attempt to validate the record
-                magic_off = s.rfind(self.cursor_magic)
+                magic_off = s.rfind(cursor_magic)
                 if magic_off > 3:
                     self.f.seek(magic_off-4)
                 while (self.guessRecordType()!= 'cursor') and (magic_off != -1):
-                    magic_off = s.rfind(self.cursor_magic, magic_off-1)
+                    magic_off = s.rfind(cursor_magic, magic_off-1)
                     if magic_off > 3:
                         self.f.seek(magic_off-4)
                 s = None
                 
                 if magic_off == -1:
                     sys.stderr.write("WARNING: Could not find cursor record.\n")
-                    self.f.seek(self.header_size)
+                    self.f.seek(header_size)
                 else:
                     self.cursor_offset = magic_off-4
                     self.f.seek(self.cursor_offset)
@@ -346,65 +371,39 @@ class evtFile:
         if not self.f:
             raise IOError, "Log file not open."
 
-        ret_val = 'unknown'        
+        wrapped_log = False
+        ret_val = 'unknown'
         cur_pos = self.f.tell()
 
         raw_str = self.f.read(4)
-        if len(raw_str) != 4:
-            self.f.seek(cur_pos)
-            return ret_val
-        (size1,) = struct.unpack('<I', raw_str)
-
-        # XXX: Can some of these should be more strict?
-        if (size1 == self.header_size):
-            self.f.seek(cur_pos+size1-4)
-            raw_str = self.f.read(4)
-            if len(raw_str) == 4:
-                (size2,) = struct.unpack('<I', raw_str)                
-                if(size2 == size1):
-                    self.f.seek(cur_pos+4)
-                    magic = self.f.read(len(self.header_log_magic
-                                            +self.header_version))
-                    if magic == (self.header_log_magic+self.header_version):
-                        ret_val = 'header'
+        if len(raw_str) == 4:
+            (size1,) = struct.unpack('<I', raw_str)
         
-        elif (size1 == self.cursor_size):
-            self.f.seek(cur_pos+size1-4)
-            raw_str = self.f.read(4)
-            if len(raw_str) == 4:
-                (size2,) = struct.unpack('<I', raw_str)                
-                if(size2 == size1):
-                    self.f.seek(cur_pos+4)
-                    magic = self.f.read(len(self.cursor_magic))
-                    if(magic == self.cursor_magic):
-                        ret_val = 'cursor'
-                    
-        elif ((size1 > self.log_fixed_size)
-              and (self.size() < cur_pos+size1)
-              and (self.size() >= cur_pos+self.log_fixed_size)):
-            self.f.seek(self.header_size+(cur_pos+size1-self.size()-4))
+            if size1 >= cursor_size:
+                if (size1 > log_fixed_size and (self.size() < cur_pos+size1)):
+                    if (self.size() < cur_pos+log_fixed_size):
+                        return ret_val
+                    wrapped_log = true
+                    self.f.seek(header_size+(cur_pos+size1-self.size()-4))
+                else:            
+                    self.f.seek(cur_pos+size1-4)
+            
+                raw_str = self.f.read(4)
+                if len(raw_str) == 4:
+                    (size2,) = struct.unpack('<I', raw_str)
 
-            raw_str = self.f.read(4)
-            if len(raw_str) == 4:
-                (size2,) = struct.unpack('<I', raw_str)
-                if(size2 == size1):
-                    self.f.seek(cur_pos+4)
-                    magic = self.f.read(len(self.header_log_magic))
-                    if(magic == self.header_log_magic):
-                        ret_val = 'wrapped-log'
+                    if (size1 == size2):
+                        self.f.seek(cur_pos)
+                        if wrapped_log:
+                            raw_str = self.f.read(self.size()-cur_pos)
+                            self.f.seek(header_size)
+                            raw_str += self.f.read(size1-len(raw_str))
+                        else:
+                            raw_str = self.f.read(size1)
 
-        elif (size1 > self.log_fixed_size):
-            self.f.seek(cur_pos+size1-4)
+                        if len(raw_str) == size1:
+                            ret_val = guessRecordType(raw_str, wrapped_log)
 
-            raw_str = self.f.read(4)
-            if len(raw_str) == 4:
-                (size2,) = struct.unpack('<I', raw_str)
-                if(size2 == size1):
-                    self.f.seek(cur_pos+4)
-                    magic = self.f.read(len(self.header_log_magic))
-                    if(magic == self.header_log_magic):
-                        ret_val = 'log'
-        
         self.f.seek(cur_pos)
         return ret_val
 
@@ -476,7 +475,7 @@ class evtFile:
         (size,) = struct.unpack('<I', size_str)
     
         fixed_fmt = '<IIIIHHHHHHIIIIII'
-        fixed_fmt_len = self.log_fixed_size - 4
+        fixed_fmt_len = log_fixed_size - 4
         
         if size < fixed_fmt_len:
             # XXX: use different exception class here
@@ -487,13 +486,13 @@ class evtFile:
         if len(rec_str) < fixed_fmt_len:
             # If this occurs, the log file is WRAPPED and the entire next record
             # should live right after the header.
-            self.f.seek(self.header_size)
+            self.f.seek(header_size)
             rec_str = self.f.read(size-4)
 
         elif len(rec_str) < (size-4):
             # If this occurs, it's WRAPPED and this record was broken in two.
             # Jump to beginning and read the rest of the record.
-            self.f.seek(self.header_size)
+            self.f.seek(header_size)
             rec_str += self.f.read(size-4-len(rec_str))
 
         variable_str_len = len(rec_str) - fixed_fmt_len
