@@ -10,7 +10,7 @@
 # For the original PHP version, please see:
 #http://www.whitehats.ca/main/members/Malik/malik_eventlogs/malik_eventlogs.html
 # 
-# Copyright (C) 2005-2006 Timothy D. Morgan
+# Copyright (C) 2005-2007 Timothy D. Morgan
 # Copyright (C) 2004 Jamie French
 #
 # This program is free software; you can redistribute it and/or
@@ -104,7 +104,7 @@ LOG = None
 argv_len = len(sys.argv)
 if (argv_len < 3) or (sys.argv[1] == '-?') or (sys.argv[1] == '--help'):
     usage()
-    sys.exit(0)
+    sys.exit(os.EX_OK)
 elif sys.argv[1] == '-l':
     if argv_len == 3:
         mode_loglist = 1
@@ -112,7 +112,7 @@ elif sys.argv[1] == '-l':
     else:
         usage()
         sys.stderr.write("ERROR: Incorrect usage for log list mode.\n")
-        sys.exit(1)
+        sys.exit(os.EX_USAGE)
 elif sys.argv[1] == '-m':
     if argv_len == 4:
         mode_meta = 1
@@ -121,7 +121,7 @@ elif sys.argv[1] == '-m':
     else:
         usage()
         sys.stderr.write("ERROR: Incorrect usage for meta information mode.\n")
-        sys.exit(1)
+        sys.exit(os.EX_USAGE)
 else:
     if (argv_len >= 3):
         DB_PATH=sys.argv[argv_len-2]
@@ -141,11 +141,11 @@ else:
             else:
                 usage()
                 sys.stderr.write("ERROR: Unrecognized option '%s'.\n" % option)
-                sys.exit(1)
+                sys.exit(os.EX_USAGE)
     else:
         usage()
         sys.stderr.write("ERROR: Incorrect usage for log parse command.\n")
-        sys.exit(1)
+        sys.exit(os.EX_USAGE)
 
 
 if mode_loglist:
@@ -157,8 +157,8 @@ if mode_loglist:
         sys.stderr.write("%s\n" % inst)
         sys.stderr.write("ERROR: Could not list services directory.\n")
         sys.stderr.write("       Did you run grokevt-builddb first?\n")
-        sys.exit(2)
-    sys.exit(0)
+        sys.exit(os.EX_OSFILE)
+    sys.exit(os.EX_OK)
 
 try:
     if print_verbose:
@@ -169,7 +169,7 @@ except Exception, inst:
     sys.stderr.write("ERROR: Could not read message repository.\n")
     sys.stderr.write("       Did you specify the correct DATABASE_DIR?\n")
     sys.stderr.write("       Did you run grokevt-builddb first?\n")
-    sys.exit(2)
+    sys.exit(os.EX_OSFILE)
 
 
 evt_file = None
@@ -183,7 +183,7 @@ except Exception, inst:
     sys.stderr.write("%s\n" % inst)
     sys.stderr.write("ERROR: Could not open log file.\n")
     sys.stderr.write("       Did grokevt-builddb finish without errors?\n")
-    sys.exit(2)
+    sys.exit(os.EX_OSFILE)
 
 
 evt_size = evt_file.size()
@@ -226,7 +226,7 @@ if mode_meta:
 
     csvwriter.writerow(meta_header)
     csvwriter.writerow(row)
-    sys.exit(0)
+    sys.exit(os.EX_OK)
 
 
 csvwriter = csv.DictWriter(sys.stdout, log_fields, '', 'ignore')

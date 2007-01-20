@@ -3,7 +3,7 @@
 # This script attempts to find log file fragments in raw binary
 # files, such as memory dumps and disk images.
 #
-# Copyright (C) 2006 Timothy D. Morgan
+# Copyright (C) 2006-2007 Timothy D. Morgan
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -21,55 +21,83 @@
 
 import sys
 import os
+import time
 import mmap
 import struct
 import grokevt
 
 def usage():
     sys.stderr.write("USAGE:\n")
-    sys.stderr.write("  %s [] <RAW_FILE>\n\n" % os.path.basename(sys.argv[0]))
+    sys.stderr.write("  %s [-?]\n" % os.path.basename(sys.argv[0]))
+    sys.stderr.write("  %s [-h] [-H] <RAW_FILE>\n\n" % os.path.basename(sys.argv[0]))
     sys.stderr.write("grokevt-findlogs attempts to find log file fragments in raw\n")
     sys.stderr.write("binary files, such as memory dumps and disk images.\n")
+    sys.stderr.write("Please see the man page for more information.\n")
 
 
-if len(sys.argv) < 1:
+def findRecords(s, magic):
+    hits = {}
+    i = s.find(magic, 0)
+    while i != -1:
+        if (i < binsz-grokevt.min_record_size+1):
+            size1 = struct.unpack("<I", s[i-4:i])[0]
+            if (size1 >= grokevt.min_record_size) and (i+size1 < binsz):
+                size2 = struct.unpack("<I", s[i+size1-8:i+size1-4])[0]
+                if size1 == size2:
+                    record = s[i-4:i+size1-4]
+                    guess = grokevt.guessRecordType(record)
+                    message_num = ''
+                    date_created = ''
+                    if guess == 'log':
+                        (mnum,dc) = struct.unpack("<II", record[8:16])
+                        message_num = "%d" % mnum
+                        date_created = time.strftime("%Y-%m-%d %H:%M:%S",
+                                                     time.gmtime(dc))
+                    hits[(i-4)] = (size1, guess, message_num, date_created)
+                    
+        i = s.find(magic, i+1)
+    return hits
+
+
+# Globals influenced by command line options
+print_header = 1
+# XXX: not used yet
+print_verbose = 0
+
+# Parse command line
+argv_len = len(sys.argv)
+if (argv_len < 2) or (sys.argv[1] == '-?') or (sys.argv[1] == '--help'):
     usage()
     sys.exit(os.EX_USAGE)
+else:
+    BIN_FILE=sys.argv[argv_len-1]
 
-binfile = sys.argv[1]
+    for option in sys.argv[1:argv_len-1]:
+        if option == '-H':
+            print_header = 0
+        elif option == '-h':
+            print_header = 1
+        else:
+            usage()
+            sys.stderr.write("ERROR: Unrecognized option '%s'.\n" % option)
+            sys.exit(os.EX_USAGE)
 
-if not os.access(binfile, os.R_OK):
+
+if not os.access(BIN_FILE, os.R_OK):
     sys.stderr.write("ERROR: DB file could not be read.")
-    sys.exit(1)
+    sys.exit(os.EX_OSFILE)
 
-binfh = file(binfile, 'r')
+
+binfh = file(BIN_FILE, 'r')
 binfn = binfh.fileno()
 # This size hack is here because on Unix, mmap of 0 size does not behave like
 # the documentation specifies. It instead returns an invalid argument error. =(
-binsz = os.stat(binfile).st_size
+binsz = os.stat(BIN_FILE).st_size
 binmm = mmap.mmap(binfn, binsz, access=mmap.ACCESS_READ)
 
-log_hits = {}
+log_hits = findRecords(binmm, grokevt.header_log_magic)
 
-i = binmm.find(grokevt.header_log_magic, 0)
-while i != -1:
-    if (i < binsz-grokevt.min_record_size+1):
-        size1 = struct.unpack("<I", binmm[i-4:i])[0]
-        if (size1 >= grokevt.min_record_size) and (i+size1 < binsz):
-            size2 = struct.unpack("<I", binmm[i+size1-8:i+size1-4])[0]
-            if size1 == size2:
-                log_hits[(i-4)] = (size1, grokevt.guessRecordType(binmm[i-4:i+size1-4]))
-    i = binmm.find(grokevt.header_log_magic, i+1)
-
-i = binmm.find(grokevt.cursor_magic, 0)
-while i != -1:
-    if (i < binsz-grokevt.min_record_size+1):
-        size1 = struct.unpack("<I", binmm[i-4:i])[0]
-        if (size1 >= grokevt.min_record_size) and (i+size1 < binsz):
-            size2 = struct.unpack("<I", binmm[i+size1-8:i+size1-4])[0]
-            if size1 == size2:
-                log_hits[(i-4)] = (size1, grokevt.guessRecordType(binmm[i-4:i+size1-4]))
-    i = binmm.find(grokevt.cursor_magic, i+1)
+log_hits.update(findRecords(binmm, grokevt.cursor_magic))
 
 binmm.close()
 binfh.close()
@@ -77,12 +105,14 @@ binfh.close()
 log_hits_keys = log_hits.keys()
 log_hits_keys.sort()
 
-print "OFFSET,LENGTH,TYPE,CONTIGUOUS"
+if print_header:
+    print "OFFSET,LENGTH,TYPE,MESSAGE_NUM,CREATED,CONTIGUOUS"
+
 contig_next = -1
 for lhk in log_hits_keys:
-    (size,type) = log_hits[lhk]
+    (size,type,num,created) = log_hits[lhk]
     if contig_next == lhk:
-        print "%d,%d,%s,*" % (lhk,size,type)
+        print "%d,%d,%s,%s,%s,*" % (lhk,size,type,num,created)
     else:
-        print "%d,%d,%s," % (lhk,size,type)
+        print "%d,%d,%s,%s,%s," % (lhk,size,type,num,created)
     contig_next = lhk + size
