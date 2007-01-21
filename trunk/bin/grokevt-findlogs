@@ -62,14 +62,9 @@ class fileSearcher:
         return -1
 
 
-    def __getitem__(self, key):
-        t = type(key)
-        if t is types.IntType:
-            self.f.seek(key)
-            return self.f.read(1)
-        elif t is types.SliceType:
-            self.f.seek(key.start)
-            return self.f.read(key.stop-key.start)
+    def read(self, offset, count):
+        self.f.seek(offset)
+        return self.f.read(count)
 
 
     def size(self):
@@ -90,7 +85,7 @@ class fileSearcher:
 def usage():
     sys.stderr.write("USAGE:\n")
     sys.stderr.write("  %s [-?]\n" % os.path.basename(sys.argv[0]))
-    sys.stderr.write("  %s [-v] [-h] [-H] <RAW_FILE>\n\n"
+    sys.stderr.write("  %s [-v] [-h] [-H] [-o <OFFSET>] <RAW_FILE>\n\n"
                      % os.path.basename(sys.argv[0]))
     sys.stderr.write("grokevt-findlogs attempts to find log file fragments in raw\n")
     sys.stderr.write("binary files, such as memory dumps and disk images.\n")
@@ -102,6 +97,7 @@ def usage():
 print_header = 1
 # XXX: not currently used
 print_verbose = 0
+start_offset = 0
 
 # Parse command line
 argv_len = len(sys.argv)
@@ -111,17 +107,30 @@ if (argv_len < 2) or (sys.argv[1] == '-?') or (sys.argv[1] == '--help'):
 else:
     BIN_FILE=sys.argv[argv_len-1]
 
-    for option in sys.argv[1:argv_len-1]:
-        if option == '-H':
-            print_header = 0
-        elif option == '-h':
-            print_header = 1
-        elif option == '-v':
-            print_verbose = 1
+    skip_one = 0
+    for i in range(1,len(sys.argv)-1):
+        if skip_one:
+            skip_one = 0
         else:
-            usage()
-            sys.stderr.write("ERROR: Unrecognized option '%s'.\n" % option)
-            sys.exit(os.EX_USAGE)
+            if sys.argv[i] == '-H':
+                print_header = 0
+            elif sys.argv[i] == '-h':
+                print_header = 1
+            elif sys.argv[i] == '-v':
+                print_verbose = 1
+            elif sys.argv[i] == '-o':
+                if i+1 < len(sys.argv):
+                    # XXX: might be nice to allow hexadecimal in addition to decimal
+                    start_offset = int(sys.argv[i+1])
+                    skip_one = 1
+                else:
+                    usage()
+                    sys.stderr.write("ERROR: -o option requires parameter.\n")
+                    sys.exit(os.EX_USAGE)
+            else:
+                usage()
+                sys.stderr.write("ERROR: Unrecognized option '%s'.\n" % option)
+                sys.exit(os.EX_USAGE)
 
 
 if not os.access(BIN_FILE, os.R_OK):
@@ -131,22 +140,22 @@ if not os.access(BIN_FILE, os.R_OK):
 
 searcher = fileSearcher(BIN_FILE,
                         (grokevt.header_log_magic, grokevt.cursor_magic))
-fsize = searcher.size()
 
 if print_header:
     print "OFFSET,LENGTH,TYPE,MESSAGE_NUM,CREATED,CONTIGUOUS"
 
-found_one = False
 contig_next = -1
-i = searcher.findOne(0)
+i = searcher.findOne(start_offset)
 while i != -1:
-    if (i < fsize-grokevt.min_record_size+1):
+    found_one = False
+    if (i + grokevt.min_record_size < searcher.size()):
         offset = i-4
-        size1 = struct.unpack("<I", searcher[offset:i])[0]
-        if (size1 >= grokevt.min_record_size) and (i+size1 < fsize):
-            record = searcher[offset:offset+size1]
-            size2 = struct.unpack("<I", record[size1-4:size1])[0]
+        size1 = struct.unpack("<I", searcher.read(offset,4))[0]
+        end = offset+size1
+        if (size1 >= grokevt.min_record_size) and (end < searcher.size()):
+            size2 = struct.unpack("<I", searcher.read(end-4,4))[0]
             if size1 == size2:
+                record = searcher.read(offset,size1)
                 guess = grokevt.guessRecordType(record)
 
                 contig = ''
@@ -164,14 +173,12 @@ while i != -1:
                 
                 elif guess != 'unknown':
                     print "%d,%d,%s,,,%s" % (offset,size1,guess,contig)
-                    contig_next = (offset + size1)
                     found_one = True
     
     if found_one:
-        contig_next = (offset + size1)
-        i = searcher.findOne(offset + size1)
+        contig_next = end
+        i = searcher.findOne(end)
     else:
         i = searcher.findOne(i+1)
-    found_one = False
 
 searcher.close()
