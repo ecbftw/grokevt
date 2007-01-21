@@ -21,47 +21,121 @@
 
 import sys
 import os
+import types
 import time
 import mmap
 import struct
 import grokevt
 
+
+class fileSearcher:
+    f = None
+    largest = 0
+    bs = 512*1024
+    strings = None
+    sz = -1
+    mm = None
+    mmapped = False
+
+    def __init__(self, file_name, strings):
+        self.f = file(BIN_FILE, 'r')
+
+        self.largest = max(map(len,strings))
+        self.bs = max(self.largest,self.bs)
+        self.strings = strings
+
+        try:
+            self.mm = mmap.mmap(self.f.fileno(), self.size(),
+                                mmap.MAP_SHARED, mmap.ACCESS_READ)
+            self.mmapped = True
+        except Exception, inst:
+            print inst
+            if print_verbose:
+                sys.stderr.write("INFO: Could not mmap file.\n")
+
+
+    def findInChunk(self, chunk):
+                hits = []
+                for s in self.strings:
+                    h = chunk.find(s)
+                    if h != -1:
+                        hits.append(h)
+                
+                return hits
+    
+
+    def findOne(self, start=0):
+        if self.mmapped:
+            buf = ''
+            for i in xrange(start,self.size(), self.bs):
+                bstart = max(start, i-self.largest)
+                bstop = min(self.size(), i+self.bs)
+                buf = self.mm[bstart:bstop]
+
+                hits = self.findInChunk(buf)
+                if len(hits) > 0:
+                    return bstart+min(hits)
+        else:
+            self.f.seek(start)
+            offset = start
+            buf = self.f.read(self.bs)
+            while buf != '':
+                hits = self.findInChunk(buf)
+                if len(hits) > 0:
+                    return offset+min(hits)
+
+                buf = buf[(self.bs - self.largest):] + self.f.read(self.bs)
+                offset += (self.bs - self.largest)
+
+        return -1
+
+
+    def __getitem__(self, key):
+        t = type(key)
+        if self.mmapped:
+            if t is types.IntType:
+                return self.mm[key]
+            elif t is types.SliceType:
+                return self.mm[key.start:key.stop]
+        else:
+            if t is types.IntType:
+                self.f.seek(key)
+                return self.f.read(1)
+            elif t is types.SliceType:
+                self.f.seek(key.start)
+                return self.f.read(key.stop-key.start)
+
+
+    def size(self):
+        if self.sz > 0:
+            return self.sz
+        
+        o = self.f.tell()
+        self.f.seek(0, 2)
+        self.sz = self.f.tell()
+        self.f.seek(o)
+        return self.sz
+
+    
+    def close(self):
+        if self.mmapped:
+            self.mm.close()
+        self.f.close()
+
+
 def usage():
     sys.stderr.write("USAGE:\n")
     sys.stderr.write("  %s [-?]\n" % os.path.basename(sys.argv[0]))
-    sys.stderr.write("  %s [-h] [-H] <RAW_FILE>\n\n" % os.path.basename(sys.argv[0]))
+    sys.stderr.write("  %s [-v] [-h] [-H] <RAW_FILE>\n\n"
+                     % os.path.basename(sys.argv[0]))
     sys.stderr.write("grokevt-findlogs attempts to find log file fragments in raw\n")
     sys.stderr.write("binary files, such as memory dumps and disk images.\n")
     sys.stderr.write("Please see the man page for more information.\n")
 
 
-def findRecords(s, magic):
-    hits = {}
-    i = s.find(magic, 0)
-    while i != -1:
-        if (i < binsz-grokevt.min_record_size+1):
-            size1 = struct.unpack("<I", s[i-4:i])[0]
-            if (size1 >= grokevt.min_record_size) and (i+size1 < binsz):
-                size2 = struct.unpack("<I", s[i+size1-8:i+size1-4])[0]
-                if size1 == size2:
-                    record = s[i-4:i+size1-4]
-                    guess = grokevt.guessRecordType(record)
-                    message_num = ''
-                    date_created = ''
-                    if guess == 'log':
-                        (mnum,dc) = struct.unpack("<II", record[8:16])
-                        message_num = "%d" % mnum
-                        date_created = time.strftime("%Y-%m-%d %H:%M:%S",
-                                                     time.gmtime(dc))
-                    hits[(i-4)] = (size1, guess, message_num, date_created)
-                    
-        i = s.find(magic, i+1)
-    return hits
-
 
 # Globals influenced by command line options
 print_header = 1
-# XXX: not used yet
 print_verbose = 0
 
 # Parse command line
@@ -77,6 +151,8 @@ else:
             print_header = 0
         elif option == '-h':
             print_header = 1
+        elif option == '-v':
+            print_verbose = 1
         else:
             usage()
             sys.stderr.write("ERROR: Unrecognized option '%s'.\n" % option)
@@ -88,31 +164,49 @@ if not os.access(BIN_FILE, os.R_OK):
     sys.exit(os.EX_OSFILE)
 
 
-binfh = file(BIN_FILE, 'r')
-binfn = binfh.fileno()
-# This size hack is here because on Unix, mmap of 0 size does not behave like
-# the documentation specifies. It instead returns an invalid argument error. =(
-binsz = os.stat(BIN_FILE).st_size
-binmm = mmap.mmap(binfn, binsz, access=mmap.ACCESS_READ)
-
-log_hits = findRecords(binmm, grokevt.header_log_magic)
-
-log_hits.update(findRecords(binmm, grokevt.cursor_magic))
-
-binmm.close()
-binfh.close()
-
-log_hits_keys = log_hits.keys()
-log_hits_keys.sort()
+searcher = fileSearcher(BIN_FILE,
+                        (grokevt.header_log_magic, grokevt.cursor_magic))
+fsize = searcher.size()
 
 if print_header:
     print "OFFSET,LENGTH,TYPE,MESSAGE_NUM,CREATED,CONTIGUOUS"
 
+found_one = False
 contig_next = -1
-for lhk in log_hits_keys:
-    (size,type,num,created) = log_hits[lhk]
-    if contig_next == lhk:
-        print "%d,%d,%s,%s,%s,*" % (lhk,size,type,num,created)
+i = searcher.findOne(0)
+while i != -1:
+    if (i < fsize-grokevt.min_record_size+1):
+        offset = i-4
+        size1 = struct.unpack("<I", searcher[offset:i])[0]
+        if (size1 >= grokevt.min_record_size) and (i+size1 < fsize):
+            record = searcher[offset:offset+size1]
+            size2 = struct.unpack("<I", record[size1-4:size1])[0]
+            if size1 == size2:
+                guess = grokevt.guessRecordType(record)
+
+                contig = ''
+                if contig_next == offset:
+                    contig = '*'
+
+                if guess == 'log':
+                    (mnum,dc) = struct.unpack("<II", record[8:16])
+                    print "%d,%d,%s,%s,%s,%s"\
+                          % (offset,size1,guess,"%d" % mnum,
+                             time.strftime("%Y-%m-%d %H:%M:%S",
+                                           time.gmtime(dc)),
+                             contig)
+                    found_one = True
+                
+                elif guess != 'unknown':
+                    print "%d,%d,%s,,,%s" % (offset,size1,guess,contig)
+                    contig_next = (offset + size1)
+                    found_one = True
+    
+    if found_one:
+        contig_next = (offset + size1)
+        i = searcher.findOne(offset + size1)
     else:
-        print "%d,%d,%s,%s,%s," % (lhk,size,type,num,created)
-    contig_next = lhk + size
+        i = searcher.findOne(i+1)
+    found_one = False
+
+searcher.close()
