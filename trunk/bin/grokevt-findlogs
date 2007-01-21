@@ -16,14 +16,13 @@
 # GNU General Public License for more details.
 #
 # vi:set tabsize=4:
-# $Id: grokevt-builddb 84 2006-05-24 12:46:40Z tim $
+# $Id$
 
 
 import sys
 import os
 import types
 import time
-import mmap
 import struct
 import grokevt
 
@@ -34,8 +33,6 @@ class fileSearcher:
     bs = 512*1024
     strings = None
     sz = -1
-    mm = None
-    mmapped = False
 
     def __init__(self, file_name, strings):
         self.f = file(BIN_FILE, 'r')
@@ -44,66 +41,35 @@ class fileSearcher:
         self.bs = max(self.largest,self.bs)
         self.strings = strings
 
-        try:
-            self.mm = mmap.mmap(self.f.fileno(), self.size(),
-                                mmap.MAP_SHARED, mmap.ACCESS_READ)
-            self.mmapped = True
-        except Exception, inst:
-            print inst
-            if print_verbose:
-                sys.stderr.write("INFO: Could not mmap file.\n")
-
-
-    def findInChunk(self, chunk):
-                hits = []
-                for s in self.strings:
-                    h = chunk.find(s)
-                    if h != -1:
-                        hits.append(h)
-                
-                return hits
-    
 
     def findOne(self, start=0):
-        if self.mmapped:
-            buf = ''
-            for i in xrange(start,self.size(), self.bs):
-                bstart = max(start, i-self.largest)
-                bstop = min(self.size(), i+self.bs)
-                buf = self.mm[bstart:bstop]
+        self.f.seek(start)
+        offset = start
+        buf = self.f.read(self.bs)
+        while buf != '':
+            hits = []
+            for s in self.strings:
+                h = buf.find(s)
+                if h != -1:
+                    hits.append(h)
 
-                hits = self.findInChunk(buf)
-                if len(hits) > 0:
-                    return bstart+min(hits)
-        else:
-            self.f.seek(start)
-            offset = start
-            buf = self.f.read(self.bs)
-            while buf != '':
-                hits = self.findInChunk(buf)
-                if len(hits) > 0:
-                    return offset+min(hits)
+            if len(hits) > 0:
+                return offset+min(hits)
 
-                buf = buf[(self.bs - self.largest):] + self.f.read(self.bs)
-                offset += (self.bs - self.largest)
+            buf = buf[(self.bs - self.largest):] + self.f.read(self.bs)
+            offset += (self.bs - self.largest)
 
         return -1
 
 
     def __getitem__(self, key):
         t = type(key)
-        if self.mmapped:
-            if t is types.IntType:
-                return self.mm[key]
-            elif t is types.SliceType:
-                return self.mm[key.start:key.stop]
-        else:
-            if t is types.IntType:
-                self.f.seek(key)
-                return self.f.read(1)
-            elif t is types.SliceType:
-                self.f.seek(key.start)
-                return self.f.read(key.stop-key.start)
+        if t is types.IntType:
+            self.f.seek(key)
+            return self.f.read(1)
+        elif t is types.SliceType:
+            self.f.seek(key.start)
+            return self.f.read(key.stop-key.start)
 
 
     def size(self):
@@ -118,8 +84,6 @@ class fileSearcher:
 
     
     def close(self):
-        if self.mmapped:
-            self.mm.close()
         self.f.close()
 
 
@@ -136,6 +100,7 @@ def usage():
 
 # Globals influenced by command line options
 print_header = 1
+# XXX: not currently used
 print_verbose = 0
 
 # Parse command line
