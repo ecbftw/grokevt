@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <refentry id='grokevt-addlog.1'>
-  <!--  $Id: grokevt-addlog.1.docbook 72 2006-07-30 20:09:07Z tim $ -->
+  <!--  $Id$ -->
   <refmeta>
     <refentrytitle>grokevt-addlog</refentrytitle>
     <manvolnum>1</manvolnum>

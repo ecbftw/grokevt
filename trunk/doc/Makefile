@@ -1,8 +1,8 @@
 # $Id$
 
 sh-var-F=$F
-MAN_PAGES=1/grokevt-addlog.1 1/grokevt-builddb.1 1/grokevt-parselog.1\
-	 1/grokevt-ripdll.1 7/grokevt.7
+MAN_PAGES=1/grokevt-addlog.1 1/grokevt-builddb.1 1/grokevt-findlogs.1\
+	1/grokevt-parselog.1 1/grokevt-ripdll.1 7/grokevt.7
 
 build:
 	mkdir -p $(BUILD_DOC)/devel
@@ -22,13 +22,9 @@ install:
 
 #XXX: Used during release only
 $(foreach p,$(MAN_PAGES),man/man$(p)):
-	txt2tags --mask-email -t man -o $@ $(notdir $@).t2t
-	txt2tags --mask-email -t txt\
-		-o $(basename $(notdir $@)).txt $(notdir $@).t2t
-
-$(foreach p,$(MAN_PAGES),man/man$(p).gz): $(foreach p,$(MAN_PAGES),man/man$(p))
-	gzip -c -9 $(subst .gz,,$@) > $@ && rm $(subst .gz,,$@)
-
+	docbook2x-man --to-stdout $(notdir $@).docbook > $@
+	cd man/man1 && gzip -9 -f *.1
+	cd man/man7 && gzip -9 -f *.7
 
 release: $(foreach p,$(MAN_PAGES),man/man$(p).gz)
 
