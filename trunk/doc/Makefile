@@ -23,8 +23,9 @@ install:
 #XXX: Used during release only
 $(foreach p,$(MAN_PAGES),man/man$(p)):
 	docbook2x-man --to-stdout $(notdir $@).docbook > $@
-	cd man/man1 && gzip -9 -f *.1
-	cd man/man7 && gzip -9 -f *.7
+
+$(foreach p,$(MAN_PAGES),man/man$(p).gz): $(foreach p,$(MAN_PAGES),man/man$(p))
+	gzip -c -9 $(subst .gz,,$@) > $@ && rm $(subst .gz,,$@)
 
 release: $(foreach p,$(MAN_PAGES),man/man$(p).gz)
 
