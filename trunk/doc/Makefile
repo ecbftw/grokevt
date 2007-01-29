@@ -6,7 +6,7 @@ MAN_PAGES=1/grokevt-addlog.1 1/grokevt-builddb.1 1/grokevt-findlogs.1\
 
 build:
 	mkdir -p $(BUILD_DOC)/devel
-	cp *.t2t *.txt $(BUILD_DOC)
+	cp *.docbook *.txt $(BUILD_DOC)
 	cp devel/*.txt $(BUILD_DOC)/devel
 	mkdir -p $(BUILD_DOC)/man/man1
 	mkdir -p $(BUILD_DOC)/man/man7

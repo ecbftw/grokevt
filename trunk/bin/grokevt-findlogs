@@ -84,7 +84,7 @@ class fileSearcher:
 
 def usage():
     sys.stderr.write("USAGE:\n")
-    sys.stderr.write("  %s [-?]\n" % os.path.basename(sys.argv[0]))
+    sys.stderr.write("  %s -?\n" % os.path.basename(sys.argv[0]))
     sys.stderr.write("  %s [-v] [-h] [-H] [-o <OFFSET>] <RAW_FILE>\n\n"
                      % os.path.basename(sys.argv[0]))
     sys.stderr.write("grokevt-findlogs attempts to find log file fragments in raw\n")
