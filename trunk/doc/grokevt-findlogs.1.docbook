@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<refentry id='grokevt-findlogs.1'>
+  <!--  $Id: grokevt-findlogs.1.docbook 72 2006-07-30 20:09:07Z tim $ -->
+  <refmeta>
+    <refentrytitle>grokevt-findlogs</refentrytitle>
+    <manvolnum>1</manvolnum>
+    <refmiscinfo class="sectdesc">File Conversion Utilities</refmiscinfo>
+  </refmeta>
+  <refnamediv id='name'>
+    <refname>grokevt-findlogs</refname>
+    <refpurpose>Attempts to find log file fragments in raw binary files, such as memory dumps and disk images.</refpurpose>
+  </refnamediv>
+
+  <refsect1 id='synopsis'>
+    <title>SYNOPSIS</title>
+    <para>
+      <command>
+	grokevt-findlogs -?
+      </command>
+    </para>
+    <para>
+      <command>
+	grokevt-findlogs [-v] [-h] [-H] [-o <replaceable>offset</replaceable>] <replaceable>raw-file</replaceable>
+      </command> 
+    </para>
+  </refsect1>
+
+  <refsect1 id='description'>
+    <title>DESCRIPTION</title>
+    <para>
+     grokevt-findlogs searches a raw binary file for event log records.  It produces a 
+     simple comma-separated values (CSV) output to stdout which includes metadata
+     and offsets of any hits.  Using the metadata and offset/contiguity information,
+     it should be easy to determine if the hits are false positives or not.
+    </para>
+  </refsect1>
+
+  <refsect1 id='arguments'>
+    <title>ARGUMENTS</title>
+
+    <variablelist remap='IP'>
+      <varlistentry>
+        <term>
+          <option><replaceable>raw-file</replaceable></option>
+        </term>
+        <listitem>
+          <para>
+           The binary file to be searched.
+	  </para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+
+  <refsect1 id='options'>
+    <title>OPTIONS</title>
+
+    <variablelist remap='IP'>
+      <varlistentry>
+        <term>
+          <option>-?</option>
+        </term>
+        <listitem>
+          <para>
+           Prints a basic usage statement.
+	  </para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+
+    <variablelist remap='IP'>
+      <varlistentry>
+        <term>
+          <option>-v</option>
+        </term>
+        <listitem>
+          <para>
+           Verbose mode.  Prints status messages to stderr, which can be helpful for debugging.
+	  </para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+
+    <variablelist remap='IP'>
+      <varlistentry>
+        <term>
+          <option>-h</option>
+        </term>
+        <listitem>
+          <para>
+           Prints a header row at the top of the CSV output
+           containing labels for each column. (This is the default behavior.)
+	  </para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+
+    <variablelist remap='IP'>
+      <varlistentry>
+        <term>
+          <option>-H</option>
+        </term>
+        <listitem>
+          <para>
+           Disables the printing of a header row.  This 
+           is useful when grokevt-findlogs is used in a script.
+	  </para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+
+    <variablelist remap='IP'>
+      <varlistentry>
+        <term>
+          <option>-o <replaceable>offset</replaceable></option>
+        </term>
+        <listitem>
+          <para>
+           Begin search at this byte offset within the binary file.
+	  </para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+
+  <refsect1 id='bugs'>
+    <title>BUGS</title>
+    <para>
+     Probably a few.  This script has not been extensively tested with some guest platforms.
+    </para>
+    <para>
+     There are likely some speed improvements that could be made.
+    </para>
+  </refsect1>
+
+  <refsect1 id='credits'>
+    <title>CREDITS</title>
+    <para>
+	Written by Timothy D. Morgan
+    </para>
+    <para>
+	Copyright (C) 2006-2007 Timothy D. Morgan
+    </para>
+  </refsect1>
+
+  <refsect1 id='license'>
+    <title>LICENSE</title>
+    <para>
+      Please see the file "LICENSE" included with this software
+      distribution.
+    </para>
+    <para>      
+      This program is distributed in the hope that it will be useful,
+      but WITHOUT ANY WARRANTY; without even the implied warranty of
+      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+      GNU General Public License version 3 for more details.
+    </para>
+  </refsect1>
+
+  <refsect1 id='seealso'>
+    <title>SEE ALSO</title>
+    <para>
+     grokevt(7) grokevt-addlog(1) grokevt-builddb(1) grokevt-parselog(1) grokevt-ripdll(1)
+    </para>
+  </refsect1>
+</refentry>
