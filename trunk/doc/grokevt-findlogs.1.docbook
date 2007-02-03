@@ -160,7 +160,7 @@
   <refsect1 id='seealso'>
     <title>SEE ALSO</title>
     <para>
-     grokevt(7) grokevt-addlog(1) grokevt-builddb(1) grokevt-parselog(1) grokevt-ripdll(1)
+     grokevt(7) grokevt-addlog(1) grokevt-builddb(1) grokevt-dumpmsgs(1) grokevt-parselog(1) grokevt-ripdll(1)
     </para>
   </refsect1>
 </refentry>
