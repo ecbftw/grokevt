@@ -1,8 +1,8 @@
 # $Id$
 
 sh-var-F=$F
-MAN_PAGES=1/grokevt-addlog.1 1/grokevt-builddb.1 1/grokevt-findlogs.1\
-	1/grokevt-parselog.1 1/grokevt-ripdll.1 7/grokevt.7
+MAN_PAGES=1/grokevt-addlog.1 1/grokevt-builddb.1 1/grokevt-dumpmsgs.1\
+	1/grokevt-findlogs.1 1/grokevt-parselog.1 1/grokevt-ripdll.1 7/grokevt.7
 
 build:
 	mkdir -p $(BUILD_DOC)/devel
