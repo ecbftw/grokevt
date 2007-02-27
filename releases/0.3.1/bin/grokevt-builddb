@@ -23,6 +23,7 @@ import os
 import re
 import popen2
 import anydbm
+import select
 import grokevt
 
 # XXX: should these be changed to absolute paths discovered at install time?
@@ -65,6 +66,8 @@ def windowsPathToUnixPath(path_list, variables, drives):
     paths = ret_val.split(';')
     ret_val = []
     for p in paths:
+        # Some paths have been found with trailing nulls and garbage.
+        p = p.split('\x00')[0]
         for s in drives.items():
             if p.startswith(s[0].lower()):
                 p = p.replace(s[0].lower(), s[1], 1)
@@ -73,20 +76,62 @@ def windowsPathToUnixPath(path_list, variables, drives):
     return ret_val
 
 
-def runRegLookupQuery(args):
-    a = [PATH_REGLOOKUP, '-H']
-    a.extend(args)
+def regLookupStderrHandler(e, args):
+    sys.stderr.write("WARNING: reglookup reported: %s" % e)
 
-    child_proc = popen2.Popen3(a, 1)
+def ripdllStderrHandler(e, args):
+    sys.stderr.write(("WARNING: while reading %s and writing %s,"
+                      +" grokevt-ripdll returned: %s")\
+                     % (args[0], args[1], e))
+
+
+class procWrapper:
+    child = None
+    files = None
+    stderr_handler = None
+    stderr_handler_args = None
+    exe_name = None
     
-    for l in child_proc.childerr.readlines():
-        sys.stderr.write("WARNING: reglookup reported: %s\n" % l)
-    child_ret = child_proc.wait()
-    if child_ret > 0:
-        sys.stderr.write("WARNING: reglookup returned code: %d." % child_ret
-                        +"  Is reglookup in your path?\n")
 
-    return child_proc.fromchild
+    def __init__(self, args, stderr_handler, stderr_handler_args=()):
+        self.stderr_handler = stderr_handler
+        self.stderr_handler_args = stderr_handler_args
+        self.exe_name = args[0]
+        self.child = popen2.Popen3(args, 1)
+        #self.child.tochild.close()
+        self.files = [self.child.childerr,self.child.fromchild]
+    
+    def readline(self):
+        l = ''
+        # XXX: could this be simpler?
+        while (l == '') and (len(self.files) > 0):
+            r, w, e = select.select(tuple(self.files),(),tuple(self.files))
+            for fh in e:
+                fh.close()
+            for fh in self.files:
+                if fh.closed:
+                    self.files.remove(fh)
+            for fh in r:
+                if fh.fileno() == self.child.childerr.fileno():
+                    el = fh.readline()
+                    if el == '':
+                        self.files.remove(fh)
+                    else:
+                        self.stderr_handler(el, self.stderr_handler_args)
+                else:
+                    l = fh.readline()
+                    if l == '':
+                        self.files.remove(fh)
+        return l
+    
+    def wait(self):
+        while self.readline() != '':
+            continue
+        child_ret = self.child.wait()
+        if child_ret > 0:
+            sys.stderr.write("WARNING: %s returned code: %d. Is it in your path?"
+                             % (self.exe_name, child_ret))
+        return child_ret
 
 
 def buildShortNamesPathsDicts(paths):
@@ -149,20 +194,14 @@ def writeDBFiles(topdir, names2paths):
     for npi in names2paths.items():
         outdb = "%s/messages/%s" % (topdir, npi[0])
         db_call = (PATH_RIPDLL, npi[1], outdb)
-        child_proc = popen2.Popen3(db_call, 1)
-        
-        for l in child_proc.childerr.readlines():
-            sys.stderr.write(("WARNING: while reading %s and writing %s,"
-                              +" grokevt-ripdll returned: %s\n")\
-                             % (npi[1], outdb, l.strip()))
-        for l in child_proc.fromchild.readlines():
-            sys.stderr.write(("WARNING: while reading %s and writing %s,"
-                              +" grokevt-ripdll returned: %s\n")\
-                             % (npi[1], outdb, l.strip()))
-        child_ret = child_proc.wait()
-        if child_ret > 0:
-            sys.stderr.write(("WARNING: grokevt-ripdll returned code: %d."
-                              +"  Is it in your path?\n") % child_ret)
+        ripdll_proc = procWrapper(db_call, ripdllStderrHandler, (npi[1], outdb))
+
+        l = ripdll_proc.readline()
+        while l != '':
+            ripdllStderrHandler(l, (npi[1], outdb))
+            l = ripdll_proc.readline()
+        ripdll_proc.wait()
+
         
 
 # Parse command line arguments
@@ -213,15 +252,17 @@ if print_verbose:
 # command line 
 
 if not CONTROL_SET_ID:
-    logs_query=["-t", "DWORD", "-p", CONTROL_SET_ID_PATH, config.registry_path]
-    fromchild = runRegLookupQuery(logs_query)
+    logs_query=[PATH_REGLOOKUP, "-H", "-t", "DWORD",
+                "-p", CONTROL_SET_ID_PATH, config.registry_path]
+    reg_proc = procWrapper(logs_query, regLookupStderrHandler)
     
-    l = fromchild.readline()
+    l = reg_proc.readline()
     if len(l) == 0:
         sys.stderr.write("ERROR: Could not automatically "
                          +"determine CONTROL_SET_ID\n")
         sys.exit(os.EX_IOERR)
 
+    reg_proc.wait()
     CONTROL_SET_ID = int(l.split(',')[2], 16)
 
 
@@ -233,39 +274,43 @@ if print_verbose:
                      % CONTROL_SET_PATH)
 
 # Next, identify all log types by grabbing all keys under the eventlog key
-logs_query=["-t", "KEY", "-p", REGPATH_EVENTLOG, config.registry_path]
-fromchild = runRegLookupQuery(logs_query)
+logs_query=[PATH_REGLOOKUP, "-H", "-t", "KEY",
+            "-p", REGPATH_EVENTLOG, config.registry_path]
+reg_proc = procWrapper(logs_query, regLookupStderrHandler)
 
 log_types = {}
 prefix_len = len(REGPATH_EVENTLOG)
-# XXX: what if REGPATH_EVENTLOG is wrong, and nothing comes back?
-l = fromchild.readline()
+
+l = reg_proc.readline()
 while l != '':
     l = l.split(',')[0][prefix_len:].lstrip('/').split('/')[0].strip()
     if l:
         # XXX: do log names need to be case-squashed?
         log_types[unquoteString(l)] = None
-    l = fromchild.readline()
+    l = reg_proc.readline()
+reg_proc.wait()
+
 
 # Now, for each log type, grab the log file path and the list of all
 # services in the Sources MULTI_SZ
 files = {}
 evt_files = {}
 for lt in log_types.keys():
-    evt_query = ["-t", "EXPAND_SZ",
+    evt_query = [PATH_REGLOOKUP, "-H", "-t", "EXPAND_SZ",
                  "-p", "%s/%s/File" % (REGPATH_EVENTLOG,lt),
                  config.registry_path]
-    fromchild = runRegLookupQuery(evt_query)
+    reg_proc = procWrapper(evt_query, regLookupStderrHandler)
 
-    l = fromchild.readline().split(',')[2].strip()
+    l = reg_proc.readline().split(',')[2].strip()
     evt_files[lt] = windowsPathToUnixPath(unquoteString(l),
                                           config.path_vars,
                                           config.drive_mapping)[0]
+    reg_proc.wait()
     
-    logs_query = ["-t", "MULTI_SZ",
+    logs_query = [PATH_REGLOOKUP, "-H", "-t", "MULTI_SZ",
                   "-p", "%s/%s/Sources" % (REGPATH_EVENTLOG,lt),
                   config.registry_path]
-    fromchild = runRegLookupQuery(logs_query)
+    reg_proc = procWrapper(logs_query, regLookupStderrHandler)
 
     log_types[lt] = {}
     log_types[lt]["event"] = {}
@@ -274,7 +319,8 @@ for lt in log_types.keys():
     
     # For each service under this log type, grab the associated event,
     # category, and parameter message file lists.
-    l = fromchild.readline()
+    l = reg_proc.readline()
+    reg_proc.wait()
     services = l.split(',')[2].split('|')
     for s in services:
         s = s.strip().lower()
@@ -285,10 +331,10 @@ for lt in log_types.keys():
     # Now grab whole tree under this log type and parse it
     lt_path = "%s/%s" % (REGPATH_EVENTLOG,lt)
     lt_path_len = len(lt_path)
-    dlls_query = ["-p", lt_path, config.registry_path]
-    fromchild = runRegLookupQuery(dlls_query)
+    dlls_query = [PATH_REGLOOKUP, "-H", "-p", lt_path, config.registry_path]
+    reg_proc = procWrapper(dlls_query, regLookupStderrHandler)
 
-    l = fromchild.readline()
+    l = reg_proc.readline()
     while l != '':
         fields = l.split(',')
         # trim unneeded prefix from path
@@ -314,7 +360,8 @@ for lt in log_types.keys():
                         files[f] = files[f]+","+s
                     else:
                         files[f] = s
-        l = fromchild.readline()
+        l = reg_proc.readline()
+    reg_proc.wait()
 
 (names2paths,paths2names) = buildShortNamesPathsDicts(files)
 
