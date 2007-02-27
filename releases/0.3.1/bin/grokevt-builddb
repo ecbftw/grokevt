@@ -2,7 +2,7 @@
 
 # This script builds message databases for use by grokevt-parselog.
 #
-# Copyright (C) 2005-2006 Timothy D. Morgan
+# Copyright (C) 2005-2007 Timothy D. Morgan
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -79,6 +79,7 @@ def windowsPathToUnixPath(path_list, variables, drives):
 def regLookupStderrHandler(e, args):
     sys.stderr.write("WARNING: reglookup reported: %s" % e)
 
+
 def ripdllStderrHandler(e, args):
     sys.stderr.write(("WARNING: while reading %s and writing %s,"
                       +" grokevt-ripdll returned: %s")\
@@ -91,7 +92,6 @@ class procWrapper:
     stderr_handler = None
     stderr_handler_args = None
     exe_name = None
-    
 
     def __init__(self, args, stderr_handler, stderr_handler_args=()):
         self.stderr_handler = stderr_handler
