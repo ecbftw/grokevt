@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<refentry id='grokevt-dumpmsgs.1'>
+  <!--  $Id$ -->
+  <refmeta>
+    <refentrytitle>grokevt-dumpmsgs</refentrytitle>
+    <manvolnum>1</manvolnum>
+    <refmiscinfo class="sectdesc">File Conversion Utilities</refmiscinfo>
+  </refmeta>
+  <refnamediv id='name'>
+    <refname>grokevt-dumpmsgs</refname>
+    <refpurpose>A tool for dumping the contents of message databases built previously by grokevt-ripdll(1).</refpurpose>
+  </refnamediv>
+
+  <refsect1 id='synopsis'>
+    <title>SYNOPSIS</title>
+    <para>
+      <command>
+        grokevt-dumpmsgs <replaceable>message-db1</replaceable> [<replaceable>message-db2</replaceable> ...]
+      </command> 
+    </para>
+  </refsect1>
+
+  <refsect1 id='description'>
+    <title>DESCRIPTION</title>
+    <para>
+	grokevt-dumpmsgs takes one or more message databases previously built with
+        grokevt-ripdll(1) and prints out all entries to stdout.  This is mainly a
+        debugging tool, but may be useful for analyzing the message contents of
+        PE files while developing other applications.
+    </para>
+  </refsect1>
+
+  <refsect1 id='arguments'>
+    <title>ARGUMENTS</title>
+    <para>
+      <command>grokevt-dumpmsgs</command> uses the following arguments:
+    </para>
+
+    <variablelist remap='IP'>
+      <varlistentry>
+        <term>
+          <option><replaceable>message-dbN</replaceable></option>
+        </term>
+        <listitem>
+          <para>
+           If multiple message databases are supplied, entries of all databases
+           are printed to stdout in the order they are provided.
+          </para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+
+  <refsect1 id='output'>
+    <title>OUTOUT</title>
+    <para>
+	grokevt-dumpmsgs prints each database entry out on a single line, in 
+        two comma-separated columns.  The first column is the message ID, 
+        which is in the format:
+        <screen>
+          XXXX-YYYYYYYY
+        </screen>
+
+        Here, XXXX represents the message's language code, and the YYYYYYYY 
+        represents the message's relative virtual address (RVA) within the message
+        block of the PE file.  
+
+        The second column contains the message itself.  Messages containing 
+        special characters (such as newlines or commas) are encoded in the same
+        manner that grokevt-parselog(1) encodes them ("\xQQ" where QQ is the 
+        hexadecimal value of the character).
+    </para>
+  </refsect1>
+
+  <refsect1 id='bugs'>
+    <title>BUGS</title>
+    <para>
+	Probably several.  This particular script has not been extensively tested.
+    </para>
+  </refsect1>
+
+  <refsect1 id='credits'>
+    <title>CREDITS</title>
+    <para>
+	Written by Timothy D. Morgan.
+    </para>
+    <para>
+	Copyright (C) 2006-2007 Timothy D. Morgan
+    </para>
+  </refsect1>
+
+  <refsect1 id='license'>
+    <title>LICENSE</title>
+    <para>
+      Please see the file "LICENSE" included with this software
+      distribution.
+    </para>
+    <para>      
+      This program is distributed in the hope that it will be useful,
+      but WITHOUT ANY WARRANTY; without even the implied warranty of
+      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+      GNU General Public License version 3 for more details.
+    </para>
+  </refsect1>
+
+  <refsect1 id='seealso'>
+    <title>SEE ALSO</title>
+    <para>
+     grokevt(7) grokevt-addlog(1) grokevt-builddb(1) grokevt-findlogs(1) grokevt-parselog(1) grokevt-ripdll(1)
+    </para>
+  </refsect1>
+</refentry>
