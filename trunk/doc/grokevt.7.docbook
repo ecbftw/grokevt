@@ -32,6 +32,8 @@
     </para>
     <para>	
 	<emphasis>Mounting and configuration:</emphasis>
+    </para>
+    <para>
 	This is the most labor-intensive step of the process.  There are
 	several technical reasons why this cannot be simpler, and it is
 	unlikely many will be resolved anytime soon. (Sorry, blame the
@@ -132,6 +134,8 @@
     </para>
     <para>
 	<emphasis>Using grokevt-builddb(1):</emphasis>
+    </para>
+    <para>
 	Once you get past the mounting and configuration step, you're in
 	good shape.  To extract the necessary information from the
 	system you just mounted, you just need to decide where you want
@@ -158,8 +162,12 @@
     </para>
     <para>
 	<emphasis>Using grokevt-parselog(1):</emphasis>
+    </para>
+    <para>
 	To run grokevt-parselog(1), you must specify the database
-	directory that you generated with grokevt-builddb(1):
+	directory that you generated with grokevt-builddb(1).  Initially,
+        you will want to find out what event logs were extracted by
+        running:
     </para>
     <para>
      <screen>
@@ -167,7 +175,7 @@
      </screen>
     </para>
     <para>
-	This will then print out all available log types, based on
+	This will print out all available event log types, based on
 	information found previously in the system's registry.  Then you
 	may view one of those logs simply by dropping the -l option, and 
 	adding it's name as the	second parameter.  For instance, to view
@@ -179,9 +187,69 @@
      </screen>
     </para>
     <para>
-	See the man page for further details.
+	See the grokevt-parselog(1) man page for further options.
     </para>
-    <!-- XXX: need an overview for grokevt-addlog and grokevt-findlogs -->
+    <para>
+     <emphasis>Finding and Parsing Log Fragments:</emphasis>
+    </para>
+    <para>
+     One may find it useful to parse deleted log files or fragments of 
+     log files found in a system's RAM dump.  A special-purpose tool, 
+     grokevt-findlogs(1) is included in this distribution which makes
+     finding log fragments easy.  It can find even a single log record by
+     itself with a relatively low rate of false positives.
+    </para>
+    <para>
+     Suppose one has a file, dump.img, which contains an image of a 
+     system's RAM, or perhaps the unallocated blocks of a filesystem
+     (as might be produced by The SleuthKit's dls(1)).  One could search
+     this dump by running:
+    </para>
+    <para>
+     <screen>
+	  grokevt-findlogs dump.img
+     </screen>
+    </para>
+    <para>
+     This will produce a listing of all hits in the file, which may 
+     include header records, cursor records, or log records, offsets and
+     contiguity information to help one eliminate any false positives.
+    </para>
+    <para> 
+     Supposing we found a log fragment in this dump that we're interested
+     in, we could simply use dd(1) or some other tool to carve out the
+     relevant data in to a file named fragment.evt.  We'd then need to
+     find a way to associate this log with a set of message templates.
+     This is what grokevt-addlog(1) is for.  Let's take a guess that the
+     fragment.evt was originally a part of System log.  We would add the
+     log into our previously built message database by running:
+    </para>
+    <para>
+     <screen>
+	  grokevt-addlog /var/db/grokevt/mysystem fragment.evt System-fragment System
+     </screen>
+    </para>
+    <para>
+     Finally, we can parse the log by simply specifying the newly 
+     imported name with grokevt-parselog(1):
+    </para>
+    <para>
+     <screen>
+	  grokevt-parselog /var/db/grokevt/mysystem System-fragment
+     </screen>
+    </para>
+    <para>
+     If we found that most of the log entries didn't have associated 
+     message templates (which would result in lots of warnings to stderr),
+     we would be pretty that fragment.evt really wasn't based on a System 
+     log.  Simply re-importing it as another log type (and a different name)
+     would let us parse it again as if it were of another type.
+    </para>
+    <para>
+     Please see the grokevt-findlogs(1) and grokevt-addlog(1) man pages for
+     more information.
+    </para>
+
   </refsect1>
 
   <refsect1 id='credits'>
