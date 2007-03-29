@@ -13,19 +13,19 @@ FILES=$(ADDLOG) $(BUILDDB) $(DUMPMSGS) $(FINDLOGS) $(PARSELOG) $(RIPDLL)
 all: $(FILES)
 
 $(ADDLOG): grokevt-addlog
-	cp grokevt-addlog $(ADDLOG)
+	install -m 0755 grokevt-addlog $(ADDLOG)
 
 $(BUILDDB): grokevt-builddb
-	cp grokevt-builddb $(BUILDDB)
+	install -m 0755 grokevt-builddb $(BUILDDB)
 
 $(DUMPMSGS): grokevt-dumpmsgs
-	cp grokevt-dumpmsgs $(DUMPMSGS)
+	install -m 0755 grokevt-dumpmsgs $(DUMPMSGS)
 
 $(FINDLOGS): grokevt-findlogs
-	cp grokevt-findlogs $(FINDLOGS)
+	install -m 0755 grokevt-findlogs $(FINDLOGS)
 
 $(PARSELOG): grokevt-parselog
-	cp grokevt-parselog $(PARSELOG)
+	install -m 0755 grokevt-parselog $(PARSELOG)
 
 $(RIPDLL): grokevt-ripdll
-	cp grokevt-ripdll $(RIPDLL)
+	install -m 0755 grokevt-ripdll $(RIPDLL)

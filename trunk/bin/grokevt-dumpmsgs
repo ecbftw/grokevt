@@ -15,7 +15,7 @@
 # GNU General Public License for more details.
 #
 # vi:set tabsize=4:
-# $Id: grokevt-builddb 84 2006-05-24 12:46:40Z tim $
+# $Id$
 
 
 import sys
