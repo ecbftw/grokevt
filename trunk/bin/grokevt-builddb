@@ -301,7 +301,11 @@ for lt in log_types.keys():
                  config.registry_path]
     reg_proc = procWrapper(evt_query, regLookupStderrHandler)
 
-    l = reg_proc.readline().split(',')[2].strip()
+    l = reg_proc.readline()
+    if l == '':
+        del log_types[lt]
+        continue
+    l = l.split(',')[2].strip()
     evt_files[lt] = windowsPathToUnixPath(unquoteString(l),
                                           config.path_vars,
                                           config.drive_mapping)[0]
