@@ -2,7 +2,7 @@
 
 # This script builds message databases for use by grokevt-parselog.
 #
-# Copyright (C) 2005-2007 Timothy D. Morgan
+# Copyright (C) 2005-2008 Timothy D. Morgan
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -303,6 +303,9 @@ for lt in log_types.keys():
 
     l = reg_proc.readline()
     if l == '':
+        if print_verbose:
+            sys.stderr.write('WARNING: Event log file path not found'
+                             +' for log type "%s".  Removing this type.\n' % lt)
         del log_types[lt]
         continue
     l = l.split(',')[2].strip()
@@ -325,12 +328,15 @@ for lt in log_types.keys():
     # category, and parameter message file lists.
     l = reg_proc.readline()
     reg_proc.wait()
-    services = l.split(',')[2].split('|')
-    for s in services:
-        s = s.strip().lower()
-        log_types[lt]["event"][s] = None
-        log_types[lt]["category"][s] = None
-        log_types[lt]["parameter"][s] = None
+    if l != '':
+        services = l.split(',')[2].split('|')
+        for s in services:
+            s = s.strip().lower()
+            log_types[lt]["event"][s] = None
+            log_types[lt]["category"][s] = None
+            log_types[lt]["parameter"][s] = None
+    elif print_verbose:
+        sys.stderr.write('WARNING: No sources found for log type "%s".\n' % lt)
 
     # Now grab whole tree under this log type and parse it
     lt_path = "%s/%s" % (REGPATH_EVENTLOG,lt)
