@@ -1,0 +1,41 @@
+Event Log Format
+================
+
+The best reference found to date on the format:
+Schuster, A. (2005). Windows Eventlogs in der forensischen Analyse. In
+M. Thorbr?gge (Ed.), Proceedings of the 12th DFN-CERT Workshop
+"Sicherheit in vernetzten Systemen", Hamburg, March 2005 (pp. D1-D16).
+ISBN: 3-00-015369-1
+And the associated presentation slides: 
+  http://www.dfn-cert.de/events/ws/2005/dfncert-ws2005-f4.pdf
+
+The info by Jamie French (aka Malik) which inspired the creation of
+GrokEVT:
+http://www.whitehats.ca/main/members/Malik/malik_eventlogs/malik_eventlogs.html
+
+Helpful chapter from "Windows NT Event Logging" (O'Reilly):
+  http://www.oreilly.com/catalog/winlog/chapter/ch02.html#40421
+
+
+Other References
+================
+
+Micro$oft's PE executable format:
+http://www.csn.ul.ie/~caolan/publink/winresdump/winresdump/doc/pefile.html
+http://www.wotsit.org/download.asp?f=pe
+
+Language Codes (exist in .rsrc sections of PE files):
+http://msdn.microsoft.com/library/en-us/intl/nls_238z.asp
+
+FormatMessage():
+http://msdn.microsoft.com/library/default.asp?url=/library/en-us/debug/base/formatmessage.asp
+http://msdn.microsoft.com/library/en-us/tools/tools/message_text_files.asp
+
+Converting binary SID's to text:
+http://blogs.msdn.com/oldnewthing/archive/2004/03/15/89753.aspx
+
+Event Types:
+http://technet2.microsoft.com/WindowsServer/en/Library/7e77c2f0-8835-4bea-b972-26edb2aceb3d1033.mspx
+
+System Error Codes:
+http://msdn.microsoft.com/library/en-us/debug/base/system_error_codes.asp
