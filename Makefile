@@ -3,14 +3,14 @@
 # This Makefile is used only for packaging releases out of Subversion.
 ################################################################################
 
-SVN_URL=svn+ssh://sentinelchicken.org/home/projects/subversion/grokevt
+SVN_URL=svn+ssh://pascal.sentinelchicken.org/home/projects/subversion/grokevt
 SUB_DIRS=$(wildcard releases/*) trunk
 
 .PHONY: all $(SUB_DIRS) clean
 export
 
 
-RELEASE_NAME=grokevt-test
+RELEASE_NAME=grokevt-trunk
 RELEASE_DEST=.
 
 all:
