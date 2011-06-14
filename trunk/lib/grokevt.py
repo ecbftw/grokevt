@@ -20,7 +20,7 @@ import time
 import types
 import re
 import struct
-import anydbm
+import dbm
 
 
 ################################################################################
@@ -96,8 +96,9 @@ def quoteString(s, specials="\\"):
     return ret_val
 
 
-def quoteUnicode(s, specials=u'\\\r\n'):
-    ret_val = u''
+def quoteUnicode(s, specials='\\\r\n'):
+    specials = specials.decode('ascii')
+    ret_val = ''
     for c in s:
         if c in specials:
             ret_val += "\\x%.2X" % ord(c)
@@ -284,7 +285,7 @@ class evtFile:
     #    (parse_meta == 1 && found cursor)   --> self.cursor['first_off']
     #
     def __init__(self, filename, message_repository, parse_meta=1):
-        self.f = file(filename, "rb")
+        self.f = open(filename, "rb")
         self.mr = message_repository
         
         if parse_meta:
@@ -369,7 +370,7 @@ class evtFile:
     # Raises: IOError
     def guessRecordType(self):
         if not self.f:
-            raise IOError, "Log file not open."
+            raise IOError("Log file not open.")
 
         wrapped_log = False
         ret_val = 'unknown'
@@ -383,7 +384,7 @@ class evtFile:
                 if (size1 > log_fixed_size and (self.size() < cur_pos+size1)):
                     if (self.size() < cur_pos+log_fixed_size):
                         return ret_val
-                    wrapped_log = true
+                    wrapped_log = True
                     self.f.seek(header_size+(cur_pos+size1-self.size()-4))
                 else:            
                     self.f.seek(cur_pos+size1-4)
@@ -420,7 +421,7 @@ class evtFile:
         raw_rec = self.f.read(fmt_len)
         
         if len(raw_rec) < fmt_len:
-            raise EOFError, "Record read is too short for format."
+            raise EOFError("Record read is too short for format.")
 
         (size1,lfle,unknown1,unknown2,
          first_off,next_off,next_num,first_num,
@@ -451,7 +452,7 @@ class evtFile:
         raw_rec = self.f.read(fmt_len)
 
         if len(raw_rec) < fmt_len:
-            raise EOFError, "Record read is too short for format."
+            raise EOFError("Record read is too short for format.")
         
         (size1,magic1,magic2,magic3,magic4,
          first_off,next_off,next_num,first_num,
@@ -471,7 +472,7 @@ class evtFile:
     def getLogRecord(self):
         size_str = self.f.read(4)
         if len(size_str) < 4:
-            raise EOFError, "Couldn't read record length"
+            raise EOFError("Couldn't read record length")
         (size,) = struct.unpack('<I', size_str)
     
         fixed_fmt = '<IIIIHHHHHHIIIIII'
@@ -479,8 +480,7 @@ class evtFile:
         
         if size < fixed_fmt_len:
             # XXX: use different exception class here
-            raise ValueError, ("Log size (%d) is too small.  Not a log record?"
-                               % size)
+            raise ValueError("Log size (%d) is too small.  Not a log record?" % size)
 
         rec_str = self.f.read(size-4)
         if len(rec_str) < fixed_fmt_len:
@@ -511,11 +511,11 @@ class evtFile:
         strs = []
         if string_offset > 0:
             strs=rec_str[string_offset-4:data_offset-4].decode(
-                source_encoding,'replace').split(u'\x00')
+                source_encoding,'replace').split('\x00')
             
         # Grab source and computer fields
         vstr = variable_str.decode(source_encoding,
-                                   'replace').split(u'\x00', 2)
+                                   'replace').split('\x00', 2)
         source = ''
         if len(vstr) > 0:
             source = vstr[0]
@@ -594,13 +594,14 @@ class messageRepository:
         msg_dir = "%s/messages" % topdir
         dbs = os.listdir(msg_dir)
         for db in dbs:
+            db = db[:len(db)-3]
             db_file = "%s/%s" % (msg_dir,db)
-            self.msg_dbs[db] = anydbm.open(db_file, "r", 0644)
+            self.msg_dbs[db] = dbm.open(db_file, "r", 0o644)
 
         log_dir = "%s/services" % topdir
         for t in ("category", "event", "parameter"):
-            db_file = "%s/%s/%s.db" % (log_dir, log, t)
-            self.svc_dbs[t] = anydbm.open(db_file, "r")
+            db_file = "%s/%s/%s" % (log_dir, log, t)
+            self.svc_dbs[t] = dbm.open(db_file, "r")
 
 
     def getMessageTemplate(self, service, rva, lang_code=None):
@@ -669,7 +670,7 @@ class grokevtConfig:
         # XXX: the os.access() call may not work correctly in suid situations.
         if os.path.isfile(fp):
             if os.access(fp, os.R_OK):
-                f = file(fp, "r")
+                f = open(fp, "rb")
                 ret_val = f.readline().rstrip('\n\r')
                 f.close()
             else:

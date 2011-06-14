@@ -29,7 +29,7 @@ import sys
 import string
 import struct
 import traceback
-import anydbm
+import dbm
 from grokevt import *
 
 
@@ -222,12 +222,11 @@ if len(sys.argv) != 3:
 dll_file = sys.argv[1]
 db_file = sys.argv[2]
 
-messages = dump_exe(file(sys.argv[1], 'r'))
+messages = dump_exe(open(sys.argv[1], 'rb'))
 
 if messages != None:
-    db = anydbm.open(db_file, "n", 0644)
+    db = dbm.open(db_file, "n", 0644)
     for msg in messages.items():
         db[msg[0]] = msg[1]
-    db.sync()
     db.close()
 

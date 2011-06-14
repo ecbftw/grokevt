@@ -152,8 +152,8 @@ if mode_loglist:
     try:
         logs = os.listdir("%s/services" % DB_PATH)
         for l in logs:
-            print l
-    except Exception, inst:
+            print(l)
+    except Exception as inst:
         sys.stderr.write("%s\n" % inst)
         sys.stderr.write("ERROR: Could not list services directory.\n")
         sys.stderr.write("       Did you run grokevt-builddb first?\n")
@@ -164,7 +164,7 @@ try:
     if print_verbose:
         sys.stderr.write("INFO: Opening message repository '%s'.\n" % DB_PATH)
     msg_repo = messageRepository(DB_PATH, LOG)
-except Exception, inst:
+except Exception as inst:
     sys.stderr.write("%s\n" % inst)
     sys.stderr.write("ERROR: Could not read message repository.\n")
     sys.stderr.write("       Did you specify the correct DATABASE_DIR?\n")
@@ -179,7 +179,7 @@ try:
         sys.stderr.write("INFO: Opening event log file at '%s'.\n"
                          % evt_filename)
     evt_file = evtFile(evt_filename, msg_repo)
-except Exception, inst:
+except Exception as inst:
     sys.stderr.write("%s\n" % inst)
     sys.stderr.write("ERROR: Could not open log file.\n")
     sys.stderr.write("       Did grokevt-builddb finish without errors?\n")
