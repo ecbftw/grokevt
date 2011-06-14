@@ -47,9 +47,9 @@ output_encoding = 'utf-8'
 
 
 # Log format constants
-header_log_magic = "\x4c\x66\x4c\x65"
-header_version = "\x01\x00\x00\x00\x01\x00\x00\x00"
-cursor_magic ="\x11\x11\x11\x11\x22\x22\x22\x22\x33\x33\x33\x33\x44\x44\x44\x44"
+header_log_magic = b"\x4c\x66\x4c\x65"
+header_version = b"\x01\x00\x00\x00\x01\x00\x00\x00"
+cursor_magic = b"\x11\x11\x11\x11\x22\x22\x22\x22\x33\x33\x33\x33\x44\x44\x44\x44"
 
 header_size = 0x30
 cursor_size = 0x28
@@ -62,16 +62,20 @@ min_record_size = min(header_size, cursor_size, log_fixed_size)
 
 # Reference:
 #  http://blogs.msdn.com/oldnewthing/archive/2004/03/15/89753.aspx
+#
+# XXX: Need to replace this with calls to winsec library once winsec has a 
+#      better memory management interface
 def binSIDtoASCII(sid_str):
-    auth = ((ord(sid_str[2])<<40)
-            | (ord(sid_str[3])<<32)
-            | (ord(sid_str[4])<<24)
-            | (ord(sid_str[5])<<16)
-            | (ord(sid_str[6])<<8)
-            | ord(sid_str[7]))
-    result = "S-%d-%d" % (ord(sid_str[0]), auth)
     rest = sid_str[8:]
-    for i in range(0,ord(sid_str[1])):
+    first = struct.unpack('BBBBBBBB', sid_str[0:8])
+    auth = ((first[2]<<40)
+            | (first[3]<<32)
+            | (first[4]<<24)
+            | (first[5]<<16)
+            | (first[6]<<8)
+            | first[7])
+    result = "S-%d-%d" % (first[0], auth)
+    for i in range(0,first[1]):
         if len(rest) >= 4:
             next_int = struct.unpack('<I', rest[:4])[0]
             rest = rest[4:]
@@ -80,28 +84,25 @@ def binSIDtoASCII(sid_str):
     return result
 
 
-# Returns a string which contains s, except for non-printable or
-# special characters are quoted in hex with the syntax '\xQQ' where QQ
-# is the hex ascii value of the quoted character.  specials must be a
-# sequence.
-def quoteString(s, specials="\\"):
+def quoteBinary(binary, specials=b"\\"):
+    # Doing it this way to support python 2 and 3
+    b = struct.unpack('B'*len(binary), binary)
+    specials = struct.unpack('B'*len(specials), specials)
     ret_val = ''
-    for c in s:
-        o = ord(c)
-        if (o < 32) or (o > 126) or (c in specials):
-            ret_val += ("\\x%.2X" % o)
+    for c in b:
+        if (c < 32) or (c > 126) or (c in specials):
+            ret_val += ("%%%.2X" % c)
         else:
-            ret_val += c
+            ret_val += chr(c)
     
     return ret_val
 
 
-def quoteUnicode(s, specials='\\\r\n'):
-    specials = specials.decode('ascii')
+def quoteUnicode(s, specials='%\r\n'):
     ret_val = ''
     for c in s:
         if c in specials:
-            ret_val += "\\x%.2X" % ord(c)
+            ret_val += "%%%.2X" % ord(c)
         else:
             ret_val += c
 
@@ -510,8 +511,8 @@ class evtFile:
         # Grab template variables
         strs = []
         if string_offset > 0:
-            strs=rec_str[string_offset-4:data_offset-4].decode(
-                source_encoding,'replace').split('\x00')
+            strs=rec_str[string_offset-4:data_offset-4].decode(source_encoding,
+                                                               'replace').split('\x00')
             
         # Grab source and computer fields
         vstr = variable_str.decode(source_encoding,
@@ -537,7 +538,7 @@ class evtFile:
             data = rec_str[data_offset-4:data_offset+data_len-4]
     
         # Retrieve and process message template
-        event_rva = (long(event_rva_offset) << 16) | event_id
+        event_rva = (event_rva_offset << 16) | event_id
         message_template = self.mr.getMessageTemplate(source, event_rva)
         message = ''
         if message_template:
@@ -562,7 +563,7 @@ class evtFile:
                 'event_id':event_id, 'event_rva':"0x%s" % event_rva,
                 'user':sid, 'computer':computer,
                 'message':message,
-                'strings':'|'.join(strs).strip('|'),
+                'strings':strs,
                 'data':data}
 
 
@@ -614,6 +615,7 @@ class messageRepository:
             mdbs = self.svc_dbs["event"].get(service.lower().encode('ascii'),
                                              None)
             if mdbs:
+                mdbs = mdbs.decode('ascii')
                 for mdb in mdbs.split(':'):
                     ret_val = self.msg_dbs[mdb].get("%s-%.8X"%(lang, rva), None)
                     if ret_val:

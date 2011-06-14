@@ -10,7 +10,7 @@
 # For the original PHP version, please see:
 #http://www.whitehats.ca/main/members/Malik/malik_eventlogs/malik_eventlogs.html
 # 
-# Copyright (C) 2005-2007 Timothy D. Morgan
+# Copyright (C) 2005-2007,2011 Timothy D. Morgan
 # Copyright (C) 2004 Jamie French
 #
 # This program is free software; you can redistribute it and/or
@@ -95,7 +95,7 @@ mode_loglist = 0
 mode_meta = 0
 print_verbose = 0
 print_header = 1
-print_unicode = 0
+print_unicode = 1
 DB_PATH = None
 LOG = None
 
@@ -229,6 +229,20 @@ if mode_meta:
     sys.exit(os.EX_OK)
 
 
+def encodeRec(rec):
+    for k in rec.keys():
+        if k == 'strings':
+            rec[k] = '|'.join((quoteUnicode(s) 
+                               for s in rec[k]))
+            rec[k] = rec[k].strip('|')
+        elif isinstance(rec[k], bytes) or isinstance(rec[k], bytearray):
+            rec[k] = quoteBinary(rec[k])
+        elif not isinstance(rec[k], int):
+            rec[k] = quoteUnicode(rec[k])
+
+    return rec
+
+
 csvwriter = csv.DictWriter(sys.stdout, log_fields, '', 'ignore')
 if print_header:
     csvwriter.writerow(log_header)
@@ -261,15 +275,7 @@ if (evt_file.header == None) or (evt_file.cursor == None):
         if record_type in ('log', 'wrapped-log'):
             # XXX: catch exceptions?
             rec = evt_file.getLogRecord()
-            for k in rec.keys():
-                if type(rec[k]) == types.StringType:
-                    rec[k] = quoteString(rec[k])
-                elif type(rec[k]) == types.UnicodeType:
-                    if print_unicode:
-                        rec[k] = quoteUnicode(rec[k]).encode(output_encoding)
-                    else:
-                        rec[k] = quoteString(rec[k].encode(output_encoding))
-        
+            rec = encodeRec(rec)        
             csvwriter.writerow(rec)
 
         elif record_type == 'cursor':
@@ -283,16 +289,9 @@ if (evt_file.header == None) or (evt_file.cursor == None):
             evt_file.seek(evt_file.tell()+header_size)
         
 else:
-    for i in xrange(evt_file.cursor['first_num'],evt_file.cursor['next_num']):
+    for i in range(evt_file.cursor['first_num'],evt_file.cursor['next_num']):
         # XXX: catch exceptions?
         rec = evt_file.getLogRecord()
-        for k in rec.keys():
-            if type(rec[k]) == types.StringType:
-                rec[k] = quoteString(rec[k])
-            elif type(rec[k]) == types.UnicodeType:
-                if print_unicode:
-                    rec[k] = quoteUnicode(rec[k]).encode(output_encoding)
-                else:
-                    rec[k] = quoteString(rec[k].encode(output_encoding))
+        rec = encodeRec(rec)
         
         csvwriter.writerow(rec)
