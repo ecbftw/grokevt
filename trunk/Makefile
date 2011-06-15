@@ -1,13 +1,10 @@
 # $Id$
 
-# This extracts the major and minor version of the python executable in
-# the current PATH.
-PYTHON_VERSION:=`echo 'import sys;\
-	print "%d.%d" % (sys.version_info[0],sys.version_info[1])' | python`
+PYTHON3_PATH:=`which python3`
+PYTHON_PATH:=`which python`
 
 # Installation prefixes.  Change to install elsewhere.
 PREFIX=/usr/local
-LIB_PREFIX:=$(PREFIX)/lib/python$(PYTHON_VERSION)/site-packages
 BIN_PREFIX=$(PREFIX)/bin
 ETC_PREFIX=$(PREFIX)/etc/grokevt
 DOC_PREFIX=$(PREFIX)/share/doc/grokevt
@@ -33,13 +30,13 @@ all: $(BUILD_TREE) $(SUB_DIRS)
 # XXX: This should be more generalized.
 install: all
 	mkdir -p $(BIN_PREFIX)
-	mkdir -p $(LIB_PREFIX)
 	mkdir -p $(ETC_PREFIX)
 	mkdir -p $(DOC_PREFIX)
 	cp -r $(BUILD_BIN)/* $(BIN_PREFIX)
-	cp -r $(BUILD_LIB)/* $(LIB_PREFIX)
 	cp -r $(BUILD_ETC)/* $(ETC_PREFIX)
 	cp -r $(BUILD_DOC)/* $(DOC_PREFIX)
+	if [ "x$(PYTHON_PATH)" != "x" ]; then $(PYTHON_PATH) grokevt-distutils.py install; fi
+	if [ "x$(PYTHON3_PATH)" != "x" ]; then $(PYTHON_PATH) grokevt-distutils.py install; fi
 	$(MAKE) -C doc install
 
 
