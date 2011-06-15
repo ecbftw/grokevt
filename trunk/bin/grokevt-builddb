@@ -94,51 +94,22 @@ def pyregfiPrintMessages():
 def ripdllStderrHandler(e, args):
     sys.stderr.write(("WARNING: while reading %s and writing %s.db,"
                       +" grokevt-ripdll returned: %s")\
-                     % (args[0], args[1], e))
+                     % (args[0], args[1], e.decode('utf-8', 'replace')))
 
 
 class procWrapper:
     child = None
-    files = None
-    stderr_handler = None
-    stderr_handler_args = None
     exe_name = None
-    
 
-    def __init__(self, args, stderr_handler, stderr_handler_args=()):
-        self.stderr_handler = stderr_handler
-        self.stderr_handler_args = stderr_handler_args
+    def __init__(self, args):
         self.exe_name = args[0]
-        #self.child = popen2.Popen3(args, 1)
-        self.child = subprocess.Popen(args, shell=False, stdin=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        #self.child.tochild.close()
-        self.files = [self.child.stdout,self.child.stderr]
+        self.child = subprocess.Popen(args, shell=False, stdin=None, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     
     def readline(self):
-        l = ''
-        # XXX: could this be simpler?
-        while (l == '') and (len(self.files) > 0):
-            r, w, e = select.select(tuple(self.files),(),tuple(self.files))
-            for fh in e:
-                fh.close()
-            for fh in self.files:
-                if fh.closed:
-                    self.files.remove(fh)
-            for fh in r:
-                if fh.fileno() == self.child.stderr.fileno():
-                    el = fh.readline()
-                    if el == '':
-                        self.files.remove(fh)
-                    else:
-                        self.stderr_handler(el, self.stderr_handler_args)
-                else:
-                    l = fh.readline()
-                    if l == '':
-                        self.files.remove(fh)
-        return l
+        return self.child.stdout.readline()
     
     def wait(self):
-        while self.readline() != '':
+        while self.readline() != b'':
             continue
         child_ret = self.child.wait()
         if child_ret > 0:
@@ -188,7 +159,7 @@ def makeOutputDirectories(topdir, logs):
     
     # Write DB version
     vf = open('%s/version' % topdir, 'w+b')
-    vf.write('%d\n' % CURRENT_DB_VERSION)
+    vf.write(('%d\n' % CURRENT_DB_VERSION).encode('utf-8'))
     vf.close()
 
 
@@ -207,10 +178,10 @@ def writeDBFiles(topdir, names2paths):
     for npi in names2paths.items():
         outdb = "%s/messages/%s" % (topdir, npi[0])
         db_call = (PATH_RIPDLL, npi[1], outdb)
-        ripdll_proc = procWrapper(db_call, ripdllStderrHandler, (npi[1], outdb))
+        ripdll_proc = procWrapper(db_call)
 
         l = ripdll_proc.readline()
-        while l != '':
+        while l != b'':
             ripdllStderrHandler(l, (npi[1], outdb))
             l = ripdll_proc.readline()
         ripdll_proc.wait()
@@ -309,11 +280,10 @@ for ltype in eventlog_key.subkeys:
     log_types[lt]["category"] = {}
     log_types[lt]["parameter"] = {}
     try:
-        data = ltype.values['Sources'].fetch_data()
+        sources = ltype.values['Sources'].fetch_data()
         if len(data) == 0 and print_verbose:
             sys.stderr.write('WARNING: No sources found for log type "%s".\n' % lt)
 
-        sources = [s.encode('ascii', 'replace') for s in data]
         pyregfiPrintMessages()
     except Exception as e:
         sys.stderr.write('WARNING: Could not obtain list of sources'
@@ -350,7 +320,7 @@ for ltype in eventlog_key.subkeys:
                   + log_types[lt]['category'][s]
                   + log_types[lt]['parameter'][s]):
             if f in files:
-                files[f] = files[f]+b","+s
+                files[f] = files[f]+","+s
             else:
                 files[f] = s
 pyregfiPrintMessages()
@@ -386,7 +356,7 @@ try:
         o = open("%s/logs/%s.evt" % (PATH_OUTPUT,ei[0]), "w+b")
         i = open(ei[1], "rb")
         buf = i.read(4096)
-        while buf != "":
+        while buf != b'':
             o.write(buf)
             buf = i.read(4096)
         o.close()

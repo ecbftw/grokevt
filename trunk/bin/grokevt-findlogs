@@ -37,7 +37,7 @@ class fileSearcher:
     def __init__(self, file_name, strings):
         self.f = file(BIN_FILE, 'r')
 
-        self.largest = max(map(len,strings))
+        self.largest = max([len(s) for s in strings])
         self.bs = max(self.largest,self.bs)
         self.strings = strings
 
@@ -142,7 +142,7 @@ searcher = fileSearcher(BIN_FILE,
                         (grokevt.header_log_magic, grokevt.cursor_magic))
 
 if print_header:
-    print "OFFSET,LENGTH,TYPE,MESSAGE_NUM,CREATED,CONTIGUOUS"
+    print("OFFSET,LENGTH,TYPE,MESSAGE_NUM,CREATED,CONTIGUOUS")
 
 contig_next = -1
 i = searcher.findOne(start_offset)
@@ -164,15 +164,15 @@ while i != -1:
 
                 if guess == 'log':
                     (mnum,dc) = struct.unpack("<II", record[8:16])
-                    print "%d,%d,%s,%s,%s,%s"\
+                    print("%d,%d,%s,%s,%s,%s"\
                           % (offset,size1,guess,"%d" % mnum,
                              time.strftime("%Y-%m-%d %H:%M:%S",
                                            time.gmtime(dc)),
-                             contig)
+                             contig))
                     found_one = True
                 
                 elif guess != 'unknown':
-                    print "%d,%d,%s,,,%s" % (offset,size1,guess,contig)
+                    print("%d,%d,%s,,,%s" % (offset,size1,guess,contig))
                     found_one = True
     
     if found_one:

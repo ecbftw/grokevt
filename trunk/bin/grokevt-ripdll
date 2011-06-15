@@ -225,8 +225,10 @@ db_file = sys.argv[2]
 messages = dump_exe(open(sys.argv[1], 'rb'))
 
 if messages != None:
-    db = dbm.open(db_file, "n", 0644)
-    for msg in messages.items():
-        db[msg[0]] = msg[1]
+    db = dbm.open(db_file, "n", 0o644)
+    for k,v in messages.items():
+        try:
+            db[k] = v
+        except Exception as e:
+            print("%s => %s" % (repr(k),repr(v)))
     db.close()
-

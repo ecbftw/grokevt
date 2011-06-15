@@ -84,7 +84,7 @@ def binSIDtoASCII(sid_str):
     return result
 
 
-def quoteBinary(binary, specials=b"\\"):
+def quoteBinary(binary, specials=b"%"):
     # Doing it this way to support python 2 and 3
     b = struct.unpack('B'*len(binary), binary)
     specials = struct.unpack('B'*len(specials), specials)
@@ -517,6 +517,7 @@ class evtFile:
         # Grab source and computer fields
         vstr = variable_str.decode(source_encoding,
                                    'replace').split('\x00', 2)
+
         source = ''
         if len(vstr) > 0:
             source = vstr[0]
@@ -539,6 +540,7 @@ class evtFile:
     
         # Retrieve and process message template
         event_rva = (event_rva_offset << 16) | event_id
+
         message_template = self.mr.getMessageTemplate(source, event_rva)
         message = ''
         if message_template:
@@ -611,11 +613,11 @@ class messageRepository:
         else:
             langs = self.languages
         
+        service = service.lower().encode('utf-8', 'replace')
         for lang in langs:
-            mdbs = self.svc_dbs["event"].get(service.lower().encode('ascii'),
-                                             None)
+            mdbs = self.svc_dbs["event"].get(service, None)
             if mdbs:
-                mdbs = mdbs.decode('ascii')
+                mdbs = mdbs.decode('utf-8', 'replace')
                 for mdb in mdbs.split(':'):
                     ret_val = self.msg_dbs[mdb].get("%s-%.8X"%(lang, rva), None)
                     if ret_val:
@@ -652,6 +654,7 @@ class grokevtConfig:
                                                        % self.profile_path)
             self.drive_mapping = self.readMappingFromFiles("%s/drives"
                                                            % self.profile_path)
+
     
     def readMappingFromFiles(self, dir):
         ret_val = {}
@@ -660,7 +663,7 @@ class grokevtConfig:
             for k in os.listdir(dir):
                 l = self.readLineFromFile("%s/%s" % (dir, k))
                 if l != None:
-                    ret_val[k] = l
+                    ret_val[k] = l.decode('utf-8', 'replace')
         else:
             sys.stderr.write("WARNING: Could not read configuration"\
                              +" directory '%s'.\n" % dir)
@@ -673,7 +676,7 @@ class grokevtConfig:
         if os.path.isfile(fp):
             if os.access(fp, os.R_OK):
                 f = open(fp, "rb")
-                ret_val = f.readline().rstrip('\n\r')
+                ret_val = f.readline().rstrip(b'\n\r')
                 f.close()
             else:
                 sys.stderr.write("WARNING: Could not read configuration"\
