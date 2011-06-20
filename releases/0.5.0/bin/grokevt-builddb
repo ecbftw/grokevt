@@ -1,0 +1,370 @@
+#!/usr/bin/env python
+
+# This script builds message databases for use by grokevt-parselog.
+#
+# Copyright (C) 2005-2008,2011 Timothy D. Morgan
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation version 3 of the
+# License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# vi:set tabsize=4:
+# $Id$
+
+
+import sys
+import os
+import re
+import subprocess
+import dbm
+import select
+import pyregfi
+import grokevt
+
+
+# XXX: should these be changed to absolute paths discovered at install time?
+CURRENT_DB_VERSION=2
+PATH_RIPDLL='grokevt-ripdll'
+
+missing_dlls = {}
+
+def usage():
+    sys.stderr.write("USAGE:\n")
+    sys.stderr.write("  %s [-v] [-c CSID] <CONFIG_PROFILE> <OUTPUT_DIR>\n\n"
+                     % os.path.basename(sys.argv[0]))
+    sys.stderr.write("grokevt-builddb builds a database tree based on a\n")
+    sys.stderr.write("single windows system for the purpose of event log\n")
+    sys.stderr.write("conversion.  Please see the man page for more\n")
+    sys.stderr.write("information.\n")
+
+
+def unquoteString(s):
+    chunks = re.split("\\\\x([0-9A-F]{2})", s);
+
+    for i in range(1,len(chunks),2):
+        chunks[i] = "%c" % int(chunks[i], 16)
+
+    return ''.join(chunks)
+
+
+def resolveCaseSensitivePath(prefix, insensitive):
+    if len(insensitive) == 0:
+        return prefix
+
+    for sub in os.listdir(prefix):
+        if sub.lower() == insensitive[0]:
+            return resolveCaseSensitivePath("%s/%s" % (prefix, sub), 
+                                            insensitive[1:])
+
+
+def windowsPathToUnixPath(path_list, variables, drives):
+    paths = path_list.lower().split(';')
+    for i in range(0,len(paths)):
+        for var,value in variables.items():
+            paths[i] = paths[i].replace(var.lower(), 
+                                        value.lower()).replace("\\","/")
+            # Some paths have been found with trailing nulls and garbage.
+            paths[i] = paths[i].split('\x00')[0]
+
+    ret_val = []
+    for p in paths:
+        for letter,upath in drives.items():
+            if p.startswith(letter.lower()):
+                p = resolveCaseSensitivePath(upath, p[len(letter)+1:].split('/'))
+                break
+        if p != None:
+            ret_val.append(p)
+
+    return ret_val
+
+
+def pyregfiPrintMessages():
+    messages = pyregfi.getLogMessages()
+    if messages != '' and messages != None:
+        lines = messages.split('\n')
+        for l in lines:
+            sys.stderr.write("WARN: pyregfi reported: %s\n" % l)
+
+def ripdllStderrHandler(e, args):
+    sys.stderr.write(("WARNING: while reading %s and writing %s.db,"
+                      +" grokevt-ripdll returned: %s")\
+                     % (args[0], args[1], e.decode('utf-8', 'replace')))
+
+
+class procWrapper:
+    child = None
+    exe_name = None
+
+    def __init__(self, args):
+        self.exe_name = args[0]
+        self.child = subprocess.Popen(args, shell=False, stdin=None, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    
+    def readline(self):
+        return self.child.stdout.readline()
+    
+    def wait(self):
+        while self.readline() != b'':
+            continue
+        child_ret = self.child.wait()
+        if child_ret > 0:
+            sys.stderr.write("WARNING: %s returned code: %d. Is it in your path?"
+                             % (self.exe_name, child_ret))
+        return child_ret
+
+
+def buildShortNamesPathsDicts(paths):
+    ret_val1 = {}
+    ret_val2 = {}
+    for p in paths.keys():
+        if os.path.isfile(p):
+            sn = os.path.basename(p).replace(':','_')
+            ext = ''
+            i = 2
+            while (sn+ext) in ret_val1:
+                ext = '_%d' % i
+                i += 1
+
+            ret_val1[sn+ext] = p
+            ret_val2[p] = sn+ext
+        else:
+            # XXX: this might be handy later
+            #missing_dlls[p] = paths[p]
+            sys.stderr.write("WARNING: %s doesn't exist.\n" % p
+                             + "WARNING:    (This may affect log output "
+                             + "for the following services: %s)\n" % paths[p])
+    
+    return (ret_val1, ret_val2)
+
+
+def makeOutputDirectories(topdir, logs):
+    dirs = []
+    for log in logs:
+        dirs.append('%s/services/%s' % (topdir,log))
+    dirs.append('%s/messages' % topdir)
+    dirs.append('%s/logs' % topdir)
+
+    for p in dirs:
+        if os.path.exists(p):
+            if not os.path.isdir(p) or not os.access(p, os.W_OK):
+                sys.stderr.write("ERROR: Access denied to '%s'.\n" % p)
+                sys.exit(os.EX_CANTCREAT)
+        else:
+            os.makedirs(p, 0o755)
+    
+    # Write DB version
+    vf = open('%s/version' % topdir, 'w+b')
+    vf.write(('%d\n' % CURRENT_DB_VERSION).encode('utf-8'))
+    vf.close()
+
+
+def writeServiceMapping(topdir, maps):
+    for lt in maps.keys():
+        for t in maps[lt].keys():
+            db_file = "%s/services/%s/%s"%(topdir,lt,t)
+            db = dbm.open(db_file, "n", 0o644)
+            for k,v in maps[lt][t].items():
+                if len(v) != 0:
+                    db[k] = v
+            db.close()
+
+
+def writeDBFiles(topdir, names2paths):
+    for npi in names2paths.items():
+        outdb = "%s/messages/%s" % (topdir, npi[0])
+        db_call = (PATH_RIPDLL, npi[1], outdb)
+        ripdll_proc = procWrapper(db_call)
+
+        l = ripdll_proc.readline()
+        while l != b'':
+            ripdllStderrHandler(l, (npi[1], outdb))
+            l = ripdll_proc.readline()
+        ripdll_proc.wait()
+
+
+
+# Parse command line arguments
+CONTROL_SET_ID = None
+print_verbose = 0
+next_is_cid = 0
+argv_len = len(sys.argv)
+if argv_len < 3:
+    usage()
+    sys.stderr.write("ERROR: Requires at least 2 arguments.\n")
+    sys.exit(os.EX_USAGE)
+else:
+    for option in sys.argv[1:argv_len-2]:
+        if next_is_cid:
+            CONTROL_SET_ID = int(option)
+            if CONTROL_SET_ID < 1:
+                usage()
+                sys.stderr.write("ERROR: CONTROL_SET_ID must be positive.\n")
+                sys.exit(os.EX_USAGE)
+            next_is_cid = 0
+        elif option == '-v':
+            print_verbose = 1
+        elif option == '-c':
+            next_is_cid = 1
+        else:
+            usage()
+            sys.stderr.write("ERROR: Unrecognized option '%s'.\n" % option)
+            sys.exit(os.EX_USAGE)
+
+    if next_is_cid:
+        usage()
+        sys.stderr.write("ERROR: -c requires parameter.\n")
+        sys.exit(os.EX_USAGE)
+        
+
+CONFIG_PROFILE=sys.argv[argv_len-2]
+PATH_OUTPUT=sys.argv[argv_len-1]
+
+
+if print_verbose:
+    sys.stderr.write("INFO: Loading configuration...\n")
+config = grokevt.grokevtConfig(grokevt.PATH_CONFIG, CONFIG_PROFILE)
+system_hive = pyregfi.openHive(config.registry_path)
+pyregfiPrintMessages()
+
+if print_verbose:
+    sys.stderr.write("INFO: Reading system registry for service information...\n")
+
+# Need to determine correct 'CurrentControlSet', if not specified at
+# command line 
+if not CONTROL_SET_ID:
+    try:
+        csid_key = system_hive.root.subkeys['Select']
+        CONTROL_SET_ID = int(csid_key.values['Current'].fetch_data())
+        del csid_key
+        pyregfiPrintMessages()
+    except Exception as e:
+        sys.stderr.write("ERROR: Could not automatically "
+                         +"determine CONTROL_SET_ID\n")
+        sys.exit(os.EX_IOERR)
+
+    if print_verbose:
+        sys.stderr.write("INFO: Detected CONTROL_SET_ID=%d\n" % CONTROL_SET_ID)
+        
+EVENTLOG_PATH=('ControlSet%.3d' % CONTROL_SET_ID, 'Services', 'Eventlog')
+
+# Next, identify all log types by grabbing all keys under the eventlog key
+log_types = {}
+evt_files = {}
+files = {}
+eventlog_key = system_hive.subtree(EVENTLOG_PATH).current_key()
+for ltype in eventlog_key.subkeys:
+    lt = ltype.name
+    log_types[lt] = {}
+
+    # Obtain path to .evt file
+    try:
+        data = ltype.values['File'].fetch_data()
+        evt_files[lt] = windowsPathToUnixPath(unquoteString(data),
+                                              config.path_vars,
+                                              config.drive_mapping)[0]
+        pyregfiPrintMessages()
+    except Exception as e:
+        if print_verbose:
+            sys.stderr.write('WARNING: Event log file path not found'
+                             +' for log type "%s".  Removing this type.\n' % lt)
+        del log_types[lt]
+        continue
+    
+    # Collect list of sources/services under this log type
+    log_types[lt]["event"] = {}
+    log_types[lt]["category"] = {}
+    log_types[lt]["parameter"] = {}
+    try:
+        sources = ltype.values['Sources'].fetch_data()
+        if len(data) == 0 and print_verbose:
+            sys.stderr.write('WARNING: No sources found for log type "%s".\n' % lt)
+
+        pyregfiPrintMessages()
+    except Exception as e:
+        sys.stderr.write('WARNING: Could not obtain list of sources'
+                         +' for log type "%s".  Removing this type.\n' % lt)
+        del log_types[lt]
+        continue
+
+    # For each source under this log type, compile the list of paths for various
+    # message files
+    for s in sources:
+        source_key = ltype.subkeys[s]
+
+        log_types[lt]["event"][s] = []
+        value = source_key.values.get('EventMessageFile', None)
+        if value != None:
+            log_types[lt]["event"][s] = windowsPathToUnixPath(value.fetch_data(),
+                                                              config.path_vars,
+                                                              config.drive_mapping)
+        log_types[lt]["category"][s] = []
+        value = source_key.values.get('CategoryMessageFile', None)
+        if value != None:
+            log_types[lt]["category"][s] = windowsPathToUnixPath(value.fetch_data(),
+                                                                 config.path_vars,
+                                                                 config.drive_mapping)
+        log_types[lt]["parameter"][s] = []
+        value = source_key.values.get('ParameterMessageFile', None)
+        if value != None:
+            log_types[lt]["parameter"][s] = windowsPathToUnixPath(value.fetch_data(),
+                                                                  config.path_vars,
+                                                                  config.drive_mapping)
+            
+        # Retain unique list of file names and their associated services
+        for f in (log_types[lt]['event'][s]
+                  + log_types[lt]['category'][s]
+                  + log_types[lt]['parameter'][s]):
+            if f in files:
+                files[f] = files[f]+","+s
+            else:
+                files[f] = s
+pyregfiPrintMessages()
+
+(names2paths,paths2names) = buildShortNamesPathsDicts(files)
+
+
+# Convert path lists to named path strings.  Filter out any unusable resources
+# and any services that have no remaining resources.
+for lt in log_types.keys():
+    for t in log_types[lt].keys():
+        for s in log_types[lt][t].keys():
+            if len(log_types[lt][t][s]) > 0:
+                tmp_str = ''
+                for i in range(0,len(log_types[lt][t][s])):
+                    if log_types[lt][t][s][i] in paths2names:
+                        tmp_str += ':' + paths2names[log_types[lt][t][s][i]]
+                log_types[lt][t][s] = tmp_str.lstrip(':')
+
+if print_verbose:
+    sys.stderr.write("INFO: Writing service mappings...\n")
+makeOutputDirectories(PATH_OUTPUT, log_types.keys())
+writeServiceMapping(PATH_OUTPUT, log_types)
+
+if print_verbose:
+    sys.stderr.write("INFO: Writing DLL databases...\n")
+writeDBFiles(PATH_OUTPUT, names2paths)
+
+if print_verbose:
+    sys.stderr.write("INFO: Copying log files...\n")
+try:
+    for ei in evt_files.items():
+        o = open("%s/logs/%s.evt" % (PATH_OUTPUT,ei[0]), "w+b")
+        i = open(ei[1], "rb")
+        buf = i.read(4096)
+        while buf != b'':
+            o.write(buf)
+            buf = i.read(4096)
+        o.close()
+        i.close()
+except Exception as inst:
+    sys.stderr.write("ERROR: %s\n" % inst)
+    sys.stderr.write("ERROR: could not copy all log files.\n")
+    sys.exit(os.EX_IOERR)
+
+if print_verbose:
+    sys.stderr.write("INFO: Done.\n")

@@ -1,0 +1,184 @@
+#!/usr/bin/python
+
+# This script attempts to find log file fragments in raw binary
+# files, such as memory dumps and disk images.
+#
+# Copyright (C) 2006-2007 Timothy D. Morgan
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation version 3 of the
+# License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# vi:set tabsize=4:
+# $Id$
+
+
+import sys
+import os
+import types
+import time
+import struct
+import grokevt
+
+
+class fileSearcher:
+    f = None
+    largest = 0
+    bs = 512*1024
+    strings = None
+    sz = -1
+
+    def __init__(self, file_name, strings):
+        self.f = open(BIN_FILE, 'rb')
+
+        self.largest = max([len(s) for s in strings])
+        self.bs = max(self.largest,self.bs)
+        self.strings = strings
+
+
+    def findOne(self, start=0):
+        self.f.seek(start)
+        offset = start
+        buf = self.f.read(self.bs)
+        while buf != '':
+            hits = []
+            for s in self.strings:
+                h = buf.find(s)
+                if h != -1:
+                    hits.append(h)
+
+            if len(hits) > 0:
+                return offset+min(hits)
+
+            buf = buf[(self.bs - self.largest):] + self.f.read(self.bs)
+            offset += (self.bs - self.largest)
+
+        return -1
+
+
+    def read(self, offset, count):
+        self.f.seek(offset)
+        return self.f.read(count)
+
+
+    def size(self):
+        if self.sz > 0:
+            return self.sz
+        
+        o = self.f.tell()
+        self.f.seek(0, 2)
+        self.sz = self.f.tell()
+        self.f.seek(o)
+        return self.sz
+
+    
+    def close(self):
+        self.f.close()
+
+
+def usage():
+    sys.stderr.write("USAGE:\n")
+    sys.stderr.write("  %s -?\n" % os.path.basename(sys.argv[0]))
+    sys.stderr.write("  %s [-v] [-h] [-H] [-o <OFFSET>] <RAW_FILE>\n\n"
+                     % os.path.basename(sys.argv[0]))
+    sys.stderr.write("grokevt-findlogs attempts to find log file fragments in raw\n")
+    sys.stderr.write("binary files, such as memory dumps and disk images.\n")
+    sys.stderr.write("Please see the man page for more information.\n")
+
+
+
+# Globals influenced by command line options
+print_header = 1
+# XXX: not currently used
+print_verbose = 0
+start_offset = 0
+
+# Parse command line
+argv_len = len(sys.argv)
+if (argv_len < 2) or (sys.argv[1] == '-?') or (sys.argv[1] == '--help'):
+    usage()
+    sys.exit(os.EX_USAGE)
+else:
+    BIN_FILE=sys.argv[argv_len-1]
+
+    skip_one = 0
+    for i in range(1,len(sys.argv)-1):
+        if skip_one:
+            skip_one = 0
+        else:
+            if sys.argv[i] == '-H':
+                print_header = 0
+            elif sys.argv[i] == '-h':
+                print_header = 1
+            elif sys.argv[i] == '-v':
+                print_verbose = 1
+            elif sys.argv[i] == '-o':
+                if i+1 < len(sys.argv):
+                    # XXX: might be nice to allow hexadecimal in addition to decimal
+                    start_offset = int(sys.argv[i+1])
+                    skip_one = 1
+                else:
+                    usage()
+                    sys.stderr.write("ERROR: -o option requires parameter.\n")
+                    sys.exit(os.EX_USAGE)
+            else:
+                usage()
+                sys.stderr.write("ERROR: Unrecognized option '%s'.\n" % option)
+                sys.exit(os.EX_USAGE)
+
+
+if not os.access(BIN_FILE, os.R_OK):
+    sys.stderr.write("ERROR: Input file could not be read.\n")
+    sys.exit(os.EX_OSFILE)
+
+
+searcher = fileSearcher(BIN_FILE,
+                        (grokevt.header_log_magic, grokevt.cursor_magic))
+
+if print_header:
+    print("OFFSET,LENGTH,TYPE,MESSAGE_NUM,CREATED,CONTIGUOUS")
+
+contig_next = -1
+i = searcher.findOne(start_offset)
+while i != -1:
+    found_one = False
+    if (i + grokevt.min_record_size < searcher.size()):
+        offset = i-4
+        size1 = struct.unpack("<I", searcher.read(offset,4))[0]
+        end = offset+size1
+        if (size1 >= grokevt.min_record_size) and (end < searcher.size()):
+            size2 = struct.unpack("<I", searcher.read(end-4,4))[0]
+            if size1 == size2:
+                record = searcher.read(offset,size1)
+                guess = grokevt.guessRecordType(record)
+
+                contig = ''
+                if contig_next == offset:
+                    contig = '*'
+
+                if guess == 'log':
+                    (mnum,dc) = struct.unpack("<II", record[8:16])
+                    print("%d,%d,%s,%s,%s,%s"\
+                          % (offset,size1,guess,"%d" % mnum,
+                             time.strftime("%Y-%m-%d %H:%M:%S",
+                                           time.gmtime(dc)),
+                             contig))
+                    found_one = True
+                
+                elif guess != 'unknown':
+                    print("%d,%d,%s,,,%s" % (offset,size1,guess,contig))
+                    found_one = True
+    
+    if found_one:
+        contig_next = end
+        i = searcher.findOne(end)
+    else:
+        i = searcher.findOne(i+1)
+
+searcher.close()

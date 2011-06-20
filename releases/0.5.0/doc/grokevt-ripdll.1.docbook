@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<refentry id='grokevt-ripdll.1'>
+  <!--  $Id$ -->
+  <refmeta>
+    <refentrytitle>grokevt-ripdll</refentrytitle>
+    <manvolnum>1</manvolnum>
+    <refmiscinfo class="sectdesc">File Conversion Utilities</refmiscinfo>
+  </refmeta>
+  <refnamediv id='name'>
+    <refname>grokevt-ripdll</refname>
+    <refpurpose>A tool for extracting message resources from a PE-formatted file.</refpurpose>
+  </refnamediv>
+
+  <refsect1 id='synopsis'>
+    <title>SYNOPSIS</title>
+    <para>
+      <command>
+	grokevt-ripdll <replaceable>input-dll</replaceable> <replaceable>output-db</replaceable>
+      </command>
+    </para>
+  </refsect1>
+
+  <refsect1 id='description'>
+    <title>DESCRIPTION</title>
+    <para>
+	grokevt-ripdll parses a PE-formatted file (modern .exe and .dll
+	files are examples PE-formatted files) and extracts all message
+	resources.  These resources are then stored in a Berkeley-style
+	database file, which maps relative virtual addresses (RVAs) to
+	the message resources themselves.  These RVAs are what can be
+	found in a windows event log file (.evt extension) to reference
+	the proper message resource.
+
+	This utility is not intended to be used directly by end-users.
+	It is used by grokevt-builddb(1) to extract resources from all
+	DLL/EXEs referenced in the registry.
+    </para>
+  </refsect1>
+
+  <refsect1 id='arguments'>
+    <title>ARGUMENTS</title>
+
+    <variablelist remap='IP'>
+      <varlistentry>
+        <term>
+          <option><replaceable>input-dll</replaceable></option>
+        </term>
+        <listitem>
+          <para>
+           This is the PE formatted file to extract resources
+           from. (It doesn't need to have a .dll extension, but
+           it is most commonly used on DLLs.)
+	  </para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+
+    <variablelist remap='IP'>
+      <varlistentry>
+        <term>
+          <option><replaceable>output-db</replaceable></option>
+        </term>
+        <listitem>
+          <para>
+           The database file to store the RVA->message mapping
+           in.  If this file already exists, it will be overwritten.
+           To extract the entries stored in this database, see 
+           grokevt-dumpmsgs(1).
+	  </para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+
+  <refsect1 id='bugs'>
+    <title>BUGS</title>
+    <para>
+     Probably a few.  This script has not been extensively tested with 
+     some guest platforms or with non-english systems.
+    </para>
+    <para>
+     The documentation used as a reference for PE formatted files was
+     not complete or not completely accurate in places.  Much
+     guess-and-check took place.
+    </para>
+  </refsect1>
+
+  <refsect1 id='credits'>
+    <title>CREDITS</title>
+    <para>
+	Original PE header code borrowed from the pymavis project.
+	For more information, see:
+        <screen>
+          http://www.mplayerhq.hu/~arpi/pymavis/
+        </screen>
+    </para>
+    <para>
+	Message resource parsing added by Timothy D. Morgan.
+    </para>
+  </refsect1>
+
+  <refsect1 id='license'>
+    <title>LICENSE</title>
+    <para>
+      Please see the file "LICENSE" included with this software
+      distribution.
+    </para>
+    <para>      
+      This program is distributed in the hope that it will be useful,
+      but WITHOUT ANY WARRANTY; without even the implied warranty of
+      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+      GNU General Public License version 3 for more details.
+    </para>
+  </refsect1>
+
+  <refsect1 id='seealso'>
+    <title>SEE ALSO</title>
+    <para>
+     grokevt(7) grokevt-addlog(1) grokevt-builddb(1) grokevt-dumpmsgs(1) grokevt-findlogs(1) grokevt-parselog(1)
+    </para>
+  </refsect1>
+</refentry>
