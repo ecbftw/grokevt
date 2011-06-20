@@ -2,7 +2,7 @@ Prerequisites
 =============
 In order to install this package, you must have the following already
 set up on your system:
- - Python 2.3+
+ - Python (tested on 2.6 and 3.1)
  - GNU Make
 
 In order to use this software you also need:
@@ -51,5 +51,4 @@ you could do:
   make PREFIX=/usr install
 
 If you just want to override the ETC_PREFIX, you need to override it
-during build *and* during install.  (Sorry, this will be fixed at some
-point.)
+during build *and* during install.
