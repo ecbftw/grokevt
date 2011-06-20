@@ -30,7 +30,7 @@
     </para>
     <para>
       <command>
-	grokevt-parselog [-v] [-H] [-h] [-U] [-u] <replaceable>database-dir</replaceable> <replaceable>log-type</replaceable>
+	grokevt-parselog [-v] [-H] [-h] <replaceable>database-dir</replaceable> <replaceable>log-type</replaceable>
       </command> 
     </para>
   </refsect1>
@@ -42,7 +42,7 @@
 	combines that information with messages templates and other
 	resources stored in a pre-generated database.  This is then
 	printed to stdout in a comma-separated values (CSV) format.  
-	The database must be created by grokevt-builddb(1).
+	The database must first be created by grokevt-builddb(1).
     </para>
   </refsect1>
 
@@ -188,35 +188,20 @@
       </varlistentry>
     </variablelist>
 
-    <variablelist remap='IP'>
-      <varlistentry>
-        <term>
-          <option>-u</option>
-        </term>
-        <listitem>
-          <para>
-           Enables the UTF-8 output of some strings.  This can be
-           dangerous on terminals that are not configured to support UTF-8.  
-	  </para>
-        </listitem>
-      </varlistentry>
-    </variablelist>
+  </refsect1>
 
-    <variablelist remap='IP'>
-      <varlistentry>
-        <term>
-          <option>-U</option>
-        </term>
-        <listitem>
-          <para>
-           Disables the use of UTF-8 for output. 
-           Unicode strings are instead converted to UTF-8 first, 
-           and then any remaining non-ASCII characters are 
-           quoted. (This is the default behavior.)
-	  </para>
-        </listitem>
-      </varlistentry>
-    </variablelist>
+  <refsect1 id='examples'>
+    <title>OUTPUT</title>
+    <para>
+      While the output format is compatible with programs (such as spreadsheets)
+      that understand the de-facto CSV standard format, the format is
+      additionally constrained in that each log entry is written to a 
+      single line.  Also, special characters and non-printable characters are
+      encoded using a URL-like encoding format of "%XX" where XX are the 
+      hexadecimal digits of an encoded character.  New line characters and other
+      special characters along with binary data are encoded this way to allow
+      for easy use of grep(1) and similar command line tools.
+    </para>
   </refsect1>
 
   <refsect1 id='examples'>
@@ -267,12 +252,6 @@
 	Andreas Schuster has contributed greatly to the understanding of
 	the event log format. 
     </para>
-    <para>
-	Copyright (C) 2005-2007 Timothy D. Morgan
-    </para>
-    <para>
-	Copyright (C) 2004 Jamie French
-    </para>
   </refsect1>
 
   <refsect1 id='license'>
@@ -285,7 +264,7 @@
       This program is distributed in the hope that it will be useful,
       but WITHOUT ANY WARRANTY; without even the implied warranty of
       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-      GNU General Public License version 2 for more details.
+      GNU General Public License version 3 for more details.
     </para>
   </refsect1>
 

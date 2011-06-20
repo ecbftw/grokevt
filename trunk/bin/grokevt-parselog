@@ -83,7 +83,7 @@ def usage():
         +"  %s -?|--help\n" % command\
         +"  %s -l <DATABASE_DIR>\n" % command\
         +"  %s -m <DATABASE_DIR> <LOG_TYPE>\n" % command\
-        +"  %s [-v] [-H] [-h] [-U] [-u] <DATABASE_DIR> <LOG_TYPE>\n\n"\
+        +"  %s [-v] [-H] [-h] <DATABASE_DIR> <LOG_TYPE>\n\n"\
         % command\
         +"This program parses a windows event log and prints a\n"\
         +"CSV version of the log to stdout.  Please see the man\n"\

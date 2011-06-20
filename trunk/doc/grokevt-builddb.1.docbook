@@ -136,9 +136,6 @@
     <para>
 	Written by Timothy D. Morgan.
     </para>
-    <para>
-	Copyright (C) 2005-2007 Timothy D. Morgan
-    </para>
   </refsect1>
 
   <refsect1 id='license'>
@@ -151,7 +148,7 @@
       This program is distributed in the hope that it will be useful,
       but WITHOUT ANY WARRANTY; without even the implied warranty of
       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-      GNU General Public License version 2 for more details.
+      GNU General Public License version 3 for more details.
     </para>
   </refsect1>
 

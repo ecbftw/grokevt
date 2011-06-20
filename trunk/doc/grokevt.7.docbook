@@ -117,12 +117,13 @@
 	Since the registry often references files in relation to this
 	variable, we need to know where it is on your system.
 	Typically, on W2K this should be 'C:\WINNT'.  On other windows
-	systems it is often 'C:\Windows'.  This path may be referenced
-	as a full windows path (with drive letters) or as a *NIX path.
+	systems it is often 'C:\Windows'.  This case-insensitive path must 
+	as a full windows path (including a drive letter).
     </para>
     <para>
 	Finally, you need to set the path of the system registry.  This
-	path  <emphasis>must</emphasis> be a *NIX path, and not a windows path.  It
+	path  <emphasis>must</emphasis> be a *NIX path, and not a windows 
+        path, and it is case-sensitive.  It
 	should be located under your %SystemRoot%.  For instance, if you
 	mount a W2K machine's C: on '/mnt/win/c', this path will
 	probably be: /mnt/win/c/WINNT/system32/config/system
@@ -269,7 +270,7 @@
       This program is distributed in the hope that it will be useful,
       but WITHOUT ANY WARRANTY; without even the implied warranty of
       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-      GNU General Public License version 2 for more details.
+      GNU General Public License version 3 for more details.
     </para>
   </refsect1>
 

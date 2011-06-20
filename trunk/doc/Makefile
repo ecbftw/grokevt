@@ -22,7 +22,8 @@ install:
 
 #XXX: Used during release only
 $(foreach p,$(MAN_PAGES),man/man$(p)):
-	docbook2x-man --to-stdout $(notdir $@).docbook > $@
+	docbook2x-man --to-stdout $(notdir $@).docbook \
+	| sed 's/.SH DESCRIPTION/\n.SH DESCRIPTION/' | sed 's/^\\fR.PP$$/\\fR\n.PP/' > $@
 
 $(foreach p,$(MAN_PAGES),man/man$(p).gz): $(foreach p,$(MAN_PAGES),man/man$(p))
 	gzip -c -9 $(subst .gz,,$@) > $@ && rm $(subst .gz,,$@)

@@ -20,7 +20,7 @@
 
 import sys
 import os
-import anydbm
+import dbm
 
 import grokevt
 
@@ -42,16 +42,16 @@ for dbfile in sys.argv[1:]:
         sys.stderr.write("ERROR: DB file could not be read.")
         sys.exit(1)
 
-    db = anydbm.open(dbfile, 'r')
+    db = dbm.open(dbfile.split('.db', 1)[0], 'r')
 
     if grokevt.template_encoding == grokevt.output_encoding:
         for key in db.keys():
-            print '%s,%s' % (key, grokevt.quoteString(db[key], '\\,"'))
+            print('%s,%s' % (key.decode('ascii'), grokevt.quoteBinary(db[key], b'%,"')))
     else:
         for key in db.keys():
             msg = db[key].decode(grokevt.template_encoding)
-            msg = grokevt.quoteString(msg.encode(grokevt.output_encoding,'replace'),
-                                      '\\,"')
-            print '%s,%s' % (key, msg)
+            msg = grokevt.quoteBinary(msg.encode(grokevt.output_encoding,'replace'),
+                                      b'%,"')
+            print('%s,%s' % (key.decode('ascii'), msg))
 
     db.close()
