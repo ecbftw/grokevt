@@ -35,7 +35,7 @@ class fileSearcher:
     sz = -1
 
     def __init__(self, file_name, strings):
-        self.f = file(BIN_FILE, 'r')
+        self.f = open(BIN_FILE, 'rb')
 
         self.largest = max([len(s) for s in strings])
         self.bs = max(self.largest,self.bs)
@@ -134,7 +134,7 @@ else:
 
 
 if not os.access(BIN_FILE, os.R_OK):
-    sys.stderr.write("ERROR: DB file could not be read.")
+    sys.stderr.write("ERROR: Input file could not be read.\n")
     sys.exit(os.EX_OSFILE)
 
 

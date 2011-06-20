@@ -6,7 +6,7 @@ set up on your system:
  - GNU Make
 
 In order to use this software you also need:
- - RegLookup
+ - RegLookup (version 1.0.0 or later)
 
 Earlier versions of Python may work, but they have not yet been tested.
 
